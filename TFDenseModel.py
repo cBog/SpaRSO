@@ -85,56 +85,75 @@ layer_std_devs = {}
 def train_step_rso(x, y):
   # best_prediction = model(x, training=True)
   # current_loss = loss_fn(y, best_prediction)
-  current_loss, best_prediction = forward_pass(x, y)
+  # current_loss, best_prediction = forward_pass(x, y)
+  init_loss, init_prediction = forward_pass(x, y)
+  # best_loss = init_loss
+  # best_prediction = init_prediction
   for layer in reversed(model.layers):
-    if layer not in layer_std_devs:
-      # import pdb; pdb.set_trace()
-      for weights in layer.get_weights():
-        layer_std_devs[layer] = np.std(weights)
-        if layer_std_devs[layer] != 0:
-          break
-    layer_weights_list = layer.get_weights()
-    for w_idx in range(len(layer_weights_list)-1, 0, -1):
-      layer_weights = layer_weights_list[w_idx]
-      weights_shape = layer_weights.shape
-      flattened_weights = layer_weights.flatten()
-      for i in range(len(flattened_weights)):
-        og_val = flattened_weights[i]
-        new_val = og_val
-        
-        delta_weight = get_delta_weight(layer_std_devs[layer])
+    if layer.get_weights():
+      if layer not in layer_std_devs:
+        # import pdb; pdb.set_trace()
+        for weights in layer.get_weights():
+          layer_std_devs[layer] = np.std(weights)
+          if layer_std_devs[layer] > 0:
+            break
+        assert(layer_std_devs[layer] > 0)
+      layer_weights_list = layer.get_weights()
+      for w_idx in range(len(layer_weights_list)-1, 0, -1):
+        layer_weights = layer_weights_list[w_idx]
+        weights_shape = layer_weights.shape
+        flattened_weights = layer_weights.flatten()
+        new_weights = np.zeros(flattened_weights.shape, dtype=flattened_weights.dtype)
+        for i in range(len(flattened_weights)):
+          current_loss = init_loss
+          # current_prediction = init_prediction
+          og_val = flattened_weights[i]
+          new_val = og_val
+          
+          delta_weight = get_delta_weight(layer_std_devs[layer])
 
-        try_val = og_val + delta_weight
-        flattened_weights[i] = try_val
-        layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
+          try_val = og_val + delta_weight
+          flattened_weights[i] = try_val
+          layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
+          layer.set_weights(layer_weights_list)
+
+          # new_prediction = model(x, training=True)
+          # new_loss = loss_fn(y, new_prediction)
+          new_loss, new_prediction = forward_pass(x, y)
+
+          if new_loss < current_loss:
+            new_val = try_val
+            current_loss = new_loss
+            # current_prediction = new_prediction
+
+          try_val = og_val - delta_weight
+          flattened_weights[i] = try_val
+          layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
+          layer.set_weights(layer_weights_list)
+
+          # new_prediction = model(x, training=True)
+          # new_loss = loss_fn(y, new_prediction)
+          new_loss, new_prediction = forward_pass(x, y)
+
+          if new_loss < current_loss:
+            new_val = try_val
+            # current_loss = new_loss
+            # current_prediction = new_prediction
+          
+          flattened_weights[i] = og_val
+          layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
+          layer.set_weights(layer_weights_list)
+
+
+          new_weights[i] = new_val
+
+        layer_weights_list[w_idx] = new_weights.reshape(weights_shape)
         layer.set_weights(layer_weights_list)
+        init_loss, init_prediction = forward_pass(x, y)
 
-        # new_prediction = model(x, training=True)
-        # new_loss = loss_fn(y, new_prediction)
-        new_loss, new_prediction = forward_pass(x, y)
+  
+  best_loss, best_prediction = forward_pass(x, y)
 
-        if new_loss < current_loss:
-          new_val = try_val
-          current_loss = new_loss
-          best_prediction = new_prediction
-
-        try_val = og_val - delta_weight
-        flattened_weights[i] = try_val
-        layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
-        layer.set_weights(layer_weights_list)
-
-        # new_prediction = model(x, training=True)
-        # new_loss = loss_fn(y, new_prediction)
-        new_loss, new_prediction = forward_pass(x, y)
-
-        if new_loss < current_loss:
-          new_val = try_val
-          current_loss = new_loss
-          best_prediction = new_prediction
-        
-        flattened_weights[i] = new_val
-        layer_weights_list[w_idx] = flattened_weights.reshape(weights_shape)
-        layer.set_weights(layer_weights_list)
   train_acc_metric.update_state(y, best_prediction)
   return current_loss
 
