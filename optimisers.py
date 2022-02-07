@@ -1,4 +1,5 @@
 import tensorflow as tf
+from keras.utils.layer_utils import count_params
 
 import numpy as np
 from tqdm import tqdm
@@ -50,12 +51,7 @@ class StandardSGD(Optimiser):
     for epoch in range(self.epochs):
       print(f"Epoch {epoch}")
       for step, (x, y) in tqdm(enumerate(dataset)):
-        # import pdb; pdb.set_trace()
         loss = self.train_step_gradients(x, y)
-        # loss = self.train_step_rso(x,y)
-
-        # loss = train_step_rso_looper.train_loop_step(x, y)
-
 
       train_acc = self.train_acc_metric.result()
       print("Training acc over epoch: %.4f" % (float(train_acc),))
@@ -67,14 +63,18 @@ class StandardSGD(Optimiser):
     return training_acc_log
 
 class WeightPerBatchRSO(Optimiser):
-  def __init__(self, model, epochs):
+  def __init__(self, model, number_of_weight_updates, random_update_order=False):
     super(WeightPerBatchRSO, self).__init__(model)
+    # import pdb; pdb.set_trace()
+    self.trainable_weight_count = count_params(model.trainable_weights)
+    self.number_of_weight_updates = number_of_weight_updates
+    self.number_of_batches = self.number_of_weight_updates * self.trainable_weight_count
     # TODO: this should be 'number_of_weight_updates'
-    self.epochs = epochs
+    # self.epochs = int()
+    self.random_update_order = random_update_order
     self.num_model_layers = len(model.layers)
     self.layer_std_devs = {}
     self.init_loop_state()
-
 
   def init_loop_state(self):
     self.layers_idx = self.num_model_layers - 1
@@ -83,8 +83,10 @@ class WeightPerBatchRSO(Optimiser):
     weight_len = len(self.model.layers[self.layers_idx].get_weights()[self.w_idx].flatten())
     if weight_len:
       self.idx = weight_len - 1
-      self.permutation = [n for n in range(0, weight_len, 1)]
-      # self.permutation = np.random.permutation(weight_len)
+      if self.random_update_order:
+        self.permutation = np.random.permutation(weight_len)
+      else:
+        self.permutation = [n for n in range(0, weight_len, 1)]
     else:
       self.idx = -1
       self.permutation = None
@@ -185,16 +187,19 @@ class WeightPerBatchRSO(Optimiser):
   def run_training(self, dataset):
     training_acc_log = []
 
-    for epoch in range(self.epochs):
-      print(f"Epoch {epoch}")
+    total_steps = 0
+    epochs = 0
+    while total_steps < self.number_of_batches:
+      print(f"Epoch {epochs}")
       for step, (x, y) in tqdm(enumerate(dataset)):
-        # import pdb; pdb.set_trace()
-        # loss = self.train_step_gradients(model, x, y)
-        # loss = self.train_step_rso(x,y)
-
+        if total_steps == self.number_of_batches:
+          break
         loss = self.train_loop_step(x, y)
+      
+      total_steps += step
+      epochs += 1
 
-      # TODO: make this every nth
+      # TODO: make this every nth or after every weight iter?
       train_acc = self.train_acc_metric.result()
       print("Training acc over epoch: %.4f" % (float(train_acc),))
 
@@ -205,11 +210,13 @@ class WeightPerBatchRSO(Optimiser):
     return training_acc_log
 
 class WeightsPerBatchRSO(Optimiser):
-  def __init__(self, model, epochs, max_weight_per_iter=200):
+  def __init__(self, model, epochs, max_weight_per_iter=np.Inf, random_update_order=False):
+    # TODO: distinguish between permute per batch and permute per weight iteration?
     super(WeightsPerBatchRSO, self).__init__(model)
     self.epochs = epochs
     self.layer_std_devs = {}
     self.max_weight_per_iter = max_weight_per_iter
+    self.random_update_order = random_update_order
 
   def train_step_rso(self, x, y):
     # best_prediction = model(x, training=True)
@@ -235,7 +242,10 @@ class WeightsPerBatchRSO(Optimiser):
           weights_shape = layer_weights.shape
           flattened_weights = layer_weights.flatten()
           # print(f"setting {len(flattened_weights)} weights")
-          permutation = np.random.permutation(len(flattened_weights))
+          if self.random_update_order:
+            permutation = np.random.permutation(len(flattened_weights))
+          else:
+            permutation = [n for n in range(0, len(flattened_weights), 1)]
           # MAX_WEIGHT_PER_ITER = self.200# MAX_WEIGHT_PER_ITER_PROPORTION * len(flattened_weights)
           for idx in range(min(len(flattened_weights),self.max_weight_per_iter)):
             # i = idx
@@ -285,11 +295,7 @@ class WeightsPerBatchRSO(Optimiser):
     for epoch in range(self.epochs):
       print(f"Epoch {epoch}")
       for step, (x, y) in tqdm(enumerate(dataset)):
-        # import pdb; pdb.set_trace()
-        # loss = self.train_step_gradients(model, x, y)
         loss = self.train_step_rso(x,y)
-
-        # loss = self.train_loop_step(x, y)
 
       # TODO: make this every nth
       train_acc = self.train_acc_metric.result()

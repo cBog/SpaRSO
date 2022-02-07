@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime
 from matplotlib import pyplot as plt
 from dataset import get_fashion_mnist
-from models import BasicFFC
+from models import BasicFFC, RSO_PAPER_MNIST_MODEL
 from optimisers import StandardSGD, WeightPerBatchRSO, WeightsPerBatchRSO, Optimiser
 
 BATCH_SIZE = 64
@@ -15,7 +15,10 @@ NUM_EPOCHS = 10
 
 train_dataset, test_dataset, class_names = get_fashion_mnist(BATCH_SIZE)
 
-model = BasicFFC.get_model()
+# model = BasicFFC.get_model()
+model = RSO_PAPER_MNIST_MODEL.get_model()
+model.summary()
+# import pdb; pdb.set_trace()
 
 def train(optimiser: Optimiser, dataset):
   training_acc_log = optimiser.run_training(dataset)
@@ -33,10 +36,10 @@ def train(optimiser: Optimiser, dataset):
 
 sgdOptimiser = StandardSGD(model, epochs=10)
 # TODO: add all options for these to constructor (e.g. random_order)
-rso1weightOptimiser = WeightPerBatchRSO(model, epochs=1)
-rsoManyWeightsOptimiser = WeightsPerBatchRSO(model, 1, max_weight_per_iter=200)
+rso1weightOptimiser = WeightPerBatchRSO(model, number_of_weight_updates=10, random_update_order=False) # (50 updates in the paper with batch size 5000?)
+rsoManyWeightsOptimiser = WeightsPerBatchRSO(model, 1, max_weight_per_iter=200, random_update_order=True)
 
-train(rso1weightOptimiser, train_dataset)
+train(sgdOptimiser, train_dataset)
 
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
