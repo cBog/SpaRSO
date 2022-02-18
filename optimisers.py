@@ -189,6 +189,7 @@ class WeightPerBatchRSO(Optimiser):
 
     total_steps = 0
     epochs = 0
+    # TODO: tidy this up to loop through weights predominantly and call next on a data iterator manually (i.e. swap the loop around)
     while total_steps < self.number_of_batches:
       print(f"Epoch {epochs}")
       for step, (x, y) in tqdm(enumerate(dataset)):
@@ -306,4 +307,71 @@ class WeightsPerBatchRSO(Optimiser):
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
     return training_acc_log
+
+class SpaRSO(Optimiser):
+# SpaRSO
+# algorithm steps as follows:
+# 	- initiate random sparsity mask for all weights (defined init_sparsity and max_sparsity)
+# 	- Loop through algorithm phases:
+# 		- Improve phase:
+# 			- loop through all non-zero weights and consider +/- norm value as per RSO algorithm and also zeroed weight
+# 			- if weight is zeroed, update the mask accordingly
+# 		- Regrow phase:
+# 			- loop through g random masked weights with a randomly generate value 
+# 				- value based on layer norm?
+# 			- decide whether to keep with same philosophy
+# 			- g is decided by either:
+# 				- max_weights - current_count 
+# 				- max_weights - max(current_count, initial)
+# 					- this will always consider a fixed number of growths as current_count reduces
+# 			- update the mask if new weights chosen
+# 		- Replace/swap phase:
+# 			- for r randomly masked weights, try swapping with random unmasked weights, decide whether to replace acording to RSO principles
+# 			- update the mask if replacements are chosen
+
+# 	TODO: need to keep logs of when events happen to measure frequencies of improvements/regrows/swaps
+# 	- there should be an equilibrium reached where loosing too many weights will cause more regrowths but number of regrowths is fixed… could play about with reducing max_sparsity as alg trains? or encouraging zeroed weights somehow…?
+
+# TODO: need to decide whether to include bias tensors
+
+
+  def __init__(self, model, initial_sparsity, maximum_sparsity, swap_proportion, update_iterations):
+    super(SpaRSO, self).__init__(model)
+    self.initial_sparsity = initial_sparsity
+    self.maximum_sparsity = maximum_sparsity
+    self.swap_proportion = swap_proportion
+    self.update_iterations = update_iterations
+
+    # define sparse masks for all layers
+    # set init proportion of all weights to initial sparsity
+    # multiply each weight tensor by its mask
+    self.count_weights = 0
+
+  def get_batch(self):
+    # return new batch each time or same batch based on some count or conditions
+    ...
+
+  def improve_phase(self):
+    # loop over non zero indices calling get_batch for each adjustment
+    ...
+
+  def regrow_phase(self):
+    # try random values for some g non-masked weights calling get_batch for each
+    ...
+
+  def replace_phase(self):
+    # for swap proportion number of weights, try a random masked value swapping for a non-masked one calling get_batch for each
+    ...
+
+  def run_training(self, dataset):
+    self.dataset = dataset
+
+    for _ in tqdm(range(self.update_iterations)):
+      self.improve_phase()
+      self.regrow_phase()
+      self.replace_phase()
+
+    # TODO: add logs and training metrics
+    
+
 

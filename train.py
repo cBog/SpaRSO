@@ -50,7 +50,7 @@ model.compile(optimizer='adam',
 
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
-is_pruning = True
+is_pruning = False
 
 if is_pruning:
   print("PRUNING TIME")
