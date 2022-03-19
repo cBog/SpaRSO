@@ -8,12 +8,12 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from dataset import get_fashion_mnist
 from models import BasicFFC, RSO_PAPER_MNIST_MODEL
-from optimisers import StandardSGD, WeightPerBatchRSO, WeightsPerBatchRSO, Optimiser
+from optimisers import SpaRSO, StandardSGD, WeightPerBatchRSO, WeightsPerBatchRSO, Optimiser, BATCH_MODE
 
 import tensorflow_model_optimization as tfmot
 prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
 
-BATCH_SIZE = 64#1024#64
+BATCH_SIZE = 512#64#1024#64
 NUM_EPOCHS = 10
 
 train_dataset, test_dataset, class_names = get_fashion_mnist(BATCH_SIZE)
@@ -41,8 +41,9 @@ sgdOptimiser = StandardSGD(model, epochs=10)
 # TODO: add all options for these to constructor (e.g. random_order)
 rso1weightOptimiser = WeightPerBatchRSO(model, number_of_weight_updates=50, random_update_order=False) # (50 updates in the paper with batch size 5000?)
 rsoManyWeightsOptimiser = WeightsPerBatchRSO(model, 1, max_weight_per_iter=200, random_update_order=True)
+spaRSO = SpaRSO(model,0.1, 0.2, 0.2, 50, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER)
 
-train(sgdOptimiser, train_dataset)
+train(spaRSO, train_dataset)
 
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
