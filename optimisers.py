@@ -313,9 +313,12 @@ class WeightsPerBatchRSO(Optimiser):
     return training_acc_log
 
 class BATCH_MODE(Enum):
-  EVERY_WEIGHT = 0
-  EVERY_PHASE = 1
-  EVERY_ITER = 3
+  EVERY_WEIGHT = "every_weight"
+  EVERY_PHASE = "every_phase"
+  EVERY_ITER = "every_iteration"
+
+  def __str__(self):
+    return self.value
 
 class WEIGHT_CHOICE(Enum):
   SAME = 0
