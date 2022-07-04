@@ -147,6 +147,7 @@ class Logger:
       file_name = f"{os.path.join(self.id_dir_path,name)}.png"
       item.savefig(file_name)
     else:
+      import pdb; pdb.set_trace()
       file_name = f"{os.path.join(self.id_dir_path,name)}.pkl"
       file = open(file_name, mode='w')
       pickle.dump(item, file)
