@@ -50,7 +50,7 @@ def train(optimiser: Optimiser, dataset):
   plt.xlabel("Epochs") 
   plt.ylabel("Training accuracy") 
   plt.plot(train_log_np)
-  LOGGER.save(f"training_acc_plot")
+  LOGGER.save(plt ,f"training_acc_plot")
 
 # TODO: add all options for these to constructor (e.g. random_order)
 # ["SGD","WsPB_RSO","WPB_RSO","spaRSO"]
