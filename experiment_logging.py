@@ -23,7 +23,6 @@ class Logger:
       res = input(f"\n Would you like to commit them (y/n)?")
       if res == 'y':
         if repo.head.commit.diff(None):
-          import pdb; pdb.set_trace()
           for diff in repo.head.commit.diff(None):
             if diff.deleted_file:
               print(f"DELETING {diff.a_path}")
@@ -50,7 +49,7 @@ class Logger:
 
     # get id and date time
     now = datetime.now()
-    self.time_id = now.strftime(f"%Y%m%d_%H%M_{self.sha}")
+    self.time_id = now.strftime(f"%Y%m%d_%H%M_{self.sha[:10]}")
     self.time_str = now.strftime("%d/%m/%Y %H:%M:%S")
 
     # make directory in logs/id
@@ -72,6 +71,7 @@ class Logger:
     lines.append(f"{description}")
     lines.append("")
     lines.append(f"ARGS: ")
+    import pdb; pdb.set_trace()
     lines.append(pprint.pformat(args, sort_dicts=True))
     lines.append("")
 
