@@ -22,9 +22,17 @@ class Logger:
       print(f"\nUNTRACKED FILES:\n{untracked_file_strings}")
       res = input(f"\n Would you like to commit them (y/n)?")
       if res == 'y':
-        repo.index.add([diff.b_path for diff in repo.head.commit.diff(None)])
-        repo.index.add([file for file in repo.untracked_files])
-        repo.index.commit(f"AUTO_RUN: {args.run_description} \n\n from {repo.head.commit.tree.hexsha}")
+        if repo.head.commit.diff(None):
+          import pdb; pdb.set_trace()
+          for diff in repo.head.commit.diff(None):
+            if diff.deleted_file:
+              repo.index.remove([diff.a_path])
+            else:
+              repo.index.add([diff.b_path])
+        if repo.untracked_files:
+          repo.index.add([file for file in repo.untracked_files])
+        
+        repo.index.commit(f"AUTO_RUN: {args.run_description} \n\n from {repo.head.commit.hexsha}")
       elif res == 'n':
         sys.exit(0)
 
@@ -33,7 +41,7 @@ class Logger:
       # repo.untracked_files
       # repo.index.add(['-A'])
       # 
-      import pdb; pdb.set_trace()
+      # import pdb; pdb.set_trace()
     assert not repo.is_dirty(), "there are uncommitted changes, cannot execute"
     self.sha = repo.head.object.hexsha
     self.description = description
