@@ -26,8 +26,10 @@ class Logger:
           import pdb; pdb.set_trace()
           for diff in repo.head.commit.diff(None):
             if diff.deleted_file:
+              print(f"DELETING {diff.a_path}")
               repo.index.remove([diff.a_path])
             else:
+              print(f"ADDING {diff.b_path}")
               repo.index.add([diff.b_path])
         if repo.untracked_files:
           repo.index.add([file for file in repo.untracked_files])
