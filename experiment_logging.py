@@ -2,7 +2,7 @@ from datetime import datetime
 import git
 import os
 import pickle
-import pprint
+from pprint import pformat
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -71,8 +71,7 @@ class Logger:
     lines.append(f"{description}")
     lines.append("")
     lines.append(f"ARGS: ")
-    import pdb; pdb.set_trace()
-    lines.append(pprint.pformat(args, sort_dicts=True))
+    lines.append(pformat(vars(args)))
     lines.append("")
 
     info_file.writelines(lines)
