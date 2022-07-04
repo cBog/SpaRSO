@@ -34,7 +34,7 @@ if args.model == "BASIC_FFC":
 elif args.model == "RSO_MNIST":
   model = RSO_PAPER_MNIST_MODEL.get_model()
 else:
-  print("model not implemented")
+  LOGGER.log("model not implemented")
   exit(1)
 
 LOGGER.log_model_summary(model)
@@ -43,14 +43,14 @@ def train(optimiser: Optimiser, dataset):
   training_acc_log = optimiser.run_training(dataset)
   
   train_log_np = np.array(training_acc_log)
-  LOGGER.save(f"training_acc_results", train_log_np)
+  LOGGER.save(train_log_np, f"training_acc_results")
 
   fig = plt.figure()
   plt.title("Training accuracy every epoch of data") 
   plt.xlabel("Epochs") 
   plt.ylabel("Training accuracy") 
   plt.plot(train_log_np)
-  LOGGER.save(plt ,f"training_acc_plot")
+  LOGGER.save(fig ,f"training_acc_plot")
 
 # TODO: add all options for these to constructor (e.g. random_order)
 # ["SGD","WsPB_RSO","WPB_RSO","spaRSO"]
@@ -63,7 +63,7 @@ elif args.optimiser == "WPB_RSO":
 elif args.optimiser == "spaRSO":
   optimiser = SpaRSO(model, args.initial_density, args.maximum_density, args.swap_proportion, args.opt_iters, consider_zero_improve=args.consider_zero_improve, batch_mode=args.batch_mode)
 else:
-  print("model not implemented")
+  LOGGER.log("optimiser not implemented")
   exit(1)
 
 train(optimiser, train_dataset)
@@ -79,7 +79,7 @@ LOGGER.log_eval_results(test_loss, test_acc)
 is_pruning = False
 
 if is_pruning:
-  print("PRUNING TIME")
+  LOGGER.log("PRUNING TIME")
   pruning_epochs = 2
   num_batches = len(train_dataset)
   end_step = np.ceil(num_batches).astype(np.int32) * pruning_epochs

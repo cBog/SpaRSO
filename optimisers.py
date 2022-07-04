@@ -9,9 +9,19 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from collections import namedtuple
 
+from experiment_logging import get_logger
+
+class LOG_LEVEL(Enum):
+  INFO = "info"
+  TRACE = "trace"
+
+  def __str__(self):
+    return self.value
+
 class Optimiser(ABC):
   def __init__(self, model):
-    self.LOGGING = False
+    self.LOGGING = True
+    self.LOGGER = get_logger()
     self.train_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy()
     self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     self.model = model
@@ -29,6 +39,12 @@ class Optimiser(ABC):
   def run_training(self, dataset):
     raise NotImplementedError()
 
+  def log(self, message: str, level=LOG_LEVEL.INFO):
+    # if level != LOG_LEVEL.TRACE:
+      # self.log(message,flush=True)
+    self.LOGGER.log(message, level)
+    # TODO: use a logging API to record all this stuff
+
 class StandardSGD(Optimiser):
   def __init__(self, model, epochs):
     super(StandardSGD, self).__init__(model)
@@ -45,6 +61,7 @@ class StandardSGD(Optimiser):
       # loss = self.loss_fn(y, prediction)
     gradients = tape.gradient(loss, self.model.trainable_variables)
     self.sgd_optimiser.apply_gradients(zip(gradients, self.model.trainable_variables))
+    # TODO: call update state more regularly!
     self.train_acc_metric.update_state(y, prediction)
     return loss
 
@@ -52,12 +69,12 @@ class StandardSGD(Optimiser):
     training_acc_log = []
 
     for epoch in range(self.epochs):
-      print(f"Epoch {epoch}")
+      self.log(f"Epoch {epoch}")
       for step, (x, y) in tqdm(enumerate(dataset)):
         loss = self.train_step_gradients(x, y)
 
       train_acc = self.train_acc_metric.result()
-      print("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
 
@@ -96,9 +113,9 @@ class WeightPerBatchRSO(Optimiser):
   
   def print_loop_state(self):
     if self.LOGGING:
-      print(f"LOOP STATE: layer: {self.layers_idx}, weights: {self.w_idx}, idx: {self.idx}")
+      self.log(f"LOOP STATE: layer: {self.layers_idx}, weights: {self.w_idx}, idx: {self.idx}")
       if self.permutation is not None:
-        print(f"permutations: [{self.permutation[0]}, {self.permutation[1]},{self.permutation[2]}, ...)")
+        self.log(f"permutations: [{self.permutation[0]}, {self.permutation[1]},{self.permutation[2]}, ...)")
 
   def loop_state_step(self):
     # decrement indices
@@ -106,11 +123,11 @@ class WeightPerBatchRSO(Optimiser):
       if self.w_idx <= 0:
         if self.layers_idx <= 0:
           self.layers_idx = self.num_model_layers - 1
-          print(f"reset layer index to {self.layers_idx}")
+          self.log(f"reset layer index to {self.layers_idx}")
         else:
           self.layers_idx -= 1
         self.w_idx = len(self.model.layers[self.layers_idx].get_weights()) - 1
-        print(f"reset weight index to {self.w_idx}")
+        self.log(f"reset weight index to {self.w_idx}")
       else:
         self.w_idx -= 1
       weight_len = len(self.model.layers[self.layers_idx].get_weights()[self.w_idx].flatten()) if self.w_idx >= 0 else 0
@@ -118,7 +135,7 @@ class WeightPerBatchRSO(Optimiser):
         self.idx = weight_len - 1
         # self.permutation = np.random.permutation(weight_len)
         self.permutation = [n for n in range(0, weight_len, 1)]
-        print(f"reset index to {self.idx}")
+        self.log(f"reset index to {self.idx}")
       else:
         self.idx = -1
         self.permutation = None
@@ -136,7 +153,7 @@ class WeightPerBatchRSO(Optimiser):
           for weights in layer.get_weights():
             self.layer_std_devs[layer] = np.std(weights)
             if self.layer_std_devs[layer] > 0:
-              print(f"layer std dev set to {self.layer_std_devs[layer]}")
+              self.log(f"layer std dev set to {self.layer_std_devs[layer]}")
               break
           assert(self.layer_std_devs[layer] > 0)
       layer_weights_list = layer.get_weights()
@@ -195,7 +212,7 @@ class WeightPerBatchRSO(Optimiser):
     epochs = 0
     # TODO: tidy this up to loop through weights predominantly and call next on a data iterator manually (i.e. swap the loop around)
     while total_steps < self.number_of_batches:
-      print(f"Epoch {epochs}")
+      self.log(f"Epoch {epochs}")
       for step, (x, y) in tqdm(enumerate(dataset)):
         if total_steps == self.number_of_batches:
           break
@@ -206,7 +223,7 @@ class WeightPerBatchRSO(Optimiser):
 
       # TODO: make this every nth or after every weight iter?
       train_acc = self.train_acc_metric.result()
-      print("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
 
@@ -230,13 +247,13 @@ class WeightsPerBatchRSO(Optimiser):
     # import pdb; pdb.set_trace()
     for layer in reversed(self.model.layers):
       if layer.get_weights():
-        # print("HERE")
+        # self.log("HERE")
         if layer not in self.layer_std_devs:
           # import pdb; pdb.set_trace()
           for weights in layer.get_weights():
             self.layer_std_devs[layer] = np.std(weights)
             if self.layer_std_devs[layer] > 0:
-              print(f"layer std dev set to {self.layer_std_devs[layer]}")
+              self.log(f"layer std dev set to {self.layer_std_devs[layer]}")
               break
           assert(self.layer_std_devs[layer] > 0)
         layer_weights_list = layer.get_weights()
@@ -246,7 +263,7 @@ class WeightsPerBatchRSO(Optimiser):
           layer_weights = layer_weights_list[w_idx]
           weights_shape = layer_weights.shape
           flattened_weights = layer_weights.flatten()
-          # print(f"setting {len(flattened_weights)} weights")
+          # self.log(f"setting {len(flattened_weights)} weights")
           if self.random_update_order:
             permutation = np.random.permutation(len(flattened_weights))
           else:
@@ -298,13 +315,13 @@ class WeightsPerBatchRSO(Optimiser):
     training_acc_log = []
 
     for epoch in range(self.epochs):
-      print(f"Epoch {epoch}")
+      self.log(f"Epoch {epoch}")
       for step, (x, y) in tqdm(enumerate(dataset)):
         loss = self.train_step_rso(x,y)
 
       # TODO: make this every nth
       train_acc = self.train_acc_metric.result()
-      print("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
 
@@ -326,10 +343,6 @@ class WEIGHT_CHOICE(Enum):
   MINUS_DELTA = 2
   ZERO = 3
   ACCIDENTAL_ZERO = 4
-
-class LOG_LEVEL(Enum):
-  INFO = 0
-  TRACE = 1
 
 class SliceInfo(NamedTuple):
   slice_idx: int
@@ -501,7 +514,7 @@ class SpaRSO(Optimiser):
     assert (self.masked_flattened_params[start_slice_idx:end_slice_idx] == weights.numpy().flatten()).all(), f"masked global and layer weights do not match\n{self.masked_flattened_params[start_slice_idx:end_slice_idx]}\n{weights.numpy().flatten()}\n{layer}"
     og_val = self.masked_flattened_params[global_idx]
     if self.sparse_mask[global_idx] == 0:
-    #   print(og_val)
+    #   self.log(og_val)
     #   if abs(og_val) <= 0:
     #     import pdb; pdb.set_trace()
     #   assert abs(og_val) > 0, f"value {og_val} not greater than zero"
@@ -511,12 +524,6 @@ class SpaRSO(Optimiser):
     local_idx = global_idx - start_slice_idx
     assert weights.numpy().flatten()[local_idx] == self.masked_flattened_params[global_idx], f"local index {local_idx} into weights does not equal global index {global_idx} into global weights"
     return SliceInfo(slice_idx, layer, weight_idx, weights, start_slice_idx, end_slice_idx, weight_shape, og_val, local_idx)
-
-
-  def log(self, message: str, level=LOG_LEVEL.INFO):
-    if level != LOG_LEVEL.TRACE:
-      print(message,flush=True)
-    # TODO: use a logging API to record all this stuff
 
   def set_dataset(self, dataset):
     self.dataset = dataset
@@ -624,7 +631,7 @@ class SpaRSO(Optimiser):
         new_loss, new_prediction = self.forward_pass(x, y)
 
         if new_loss < current_loss:
-          # print("CHOSEN ZERO")
+          # self.log("CHOSEN ZERO")
           choice = WEIGHT_CHOICE.ZERO
           new_val = try_val
           current_loss = new_loss
@@ -633,7 +640,7 @@ class SpaRSO(Optimiser):
       # if zero chosen then update the mask and indices list and parameter count
       if new_val == 0:
         if choice != WEIGHT_CHOICE.ZERO:
-          # print("ALREADY ZERO")
+          # self.log("ALREADY ZERO")
           choice = WEIGHT_CHOICE.ACCIDENTAL_ZERO
         # TODO: possibly add logic to not do this when masking turned off (if I add that mode)
         else:
@@ -718,7 +725,7 @@ class SpaRSO(Optimiser):
         self.active_params += 1
         self.unmasked_indices = np.append(self.unmasked_indices, index)
         self.log(f"index weight added [{index}]={new_val}", level=LOG_LEVEL.TRACE)
-        # print(f"growth: {self.active_params}, {(self.sparse_mask>0).sum()}")
+        # self.log(f"growth: {self.active_params}, {(self.sparse_mask>0).sum()}")
       else:
         self.log(f"index weight not added {index}", level=LOG_LEVEL.TRACE)
 
@@ -832,6 +839,7 @@ class SpaRSO(Optimiser):
       slice_info = self.get_slice_info_from_global_index(add_index)
       slice_info = self.get_slice_info_from_global_index(remove_index)
 
+      # TODO: save weights
       self.train_acc_metric.update_state(y, best_prediction)
 
     self.unmasked_indices = np.sort(self.unmasked_indices)
@@ -849,11 +857,11 @@ class SpaRSO(Optimiser):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       self.regrow_phase()
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      print("REPLACE TIME", flush=True)#TODO remove this print
+      self.log("REPLACE TIME", flush=True)#TODO remove this self.log
       self.replace_phase()
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()
-      print("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
 

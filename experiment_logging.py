@@ -57,7 +57,7 @@ class Logger:
     self.sha = repo.head.object.hexsha
     self.description = description
 
-    self.stdout_log_types = ["default"]
+    self.stdout_log_types = ["default","INFO"]
 
     # get id and date time
     now = datetime.now()
@@ -106,7 +106,7 @@ class Logger:
 
   def write(self, message):
         self.terminal.write(message)
-        self.std_out_file.write(message)  
+        self.std_out_file.write(message)
 
   def flush(self):
       # needed for python 3 compatibility.
@@ -129,25 +129,23 @@ class Logger:
       print(report_string, file=f)
 
   def log(self, text, log_type_str="default"):
-    import pdb; pdb.set_trace()
     # append a line to the log file
     now = datetime.now()
     date_time_now_str = now.strftime("%H:%M:%S")
-    out_str = f"{date_time_now_str} [{log_type_str}]: "
+    out_str = f"{date_time_now_str} [{log_type_str}]: {text}\n"
     self.output_log_file.write(out_str)
     if log_type_str in self.stdout_log_types:
       print(out_str)
-    self.output_log_file.flush()
+    # self.output_log_file.flush()
   
-  def save(self, item, name):
+  def save(self, item, name:str):
     if isinstance(item, (np.ndarray, np.generic)):
-      file_name = f"{os.path.join(self.id_dir_path,name)}.np"
+      file_name = f"{os.path.join(self.id_dir_path,name)}"
       np.save(file_name, item)
     elif isinstance(item, plt.Figure):
       file_name = f"{os.path.join(self.id_dir_path,name)}.png"
       item.savefig(file_name)
     else:
-      import pdb; pdb.set_trace()
       file_name = f"{os.path.join(self.id_dir_path,name)}.pkl"
       file = open(file_name, mode='w')
       pickle.dump(item, file)
