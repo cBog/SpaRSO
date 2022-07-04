@@ -8,14 +8,14 @@ from matplotlib import pyplot as plt
 from dataset import get_fashion_mnist
 from models import BasicFFC, RSO_PAPER_MNIST_MODEL
 from optimisers import SpaRSO, StandardSGD, WeightPerBatchRSO, WeightsPerBatchRSO, Optimiser, BATCH_MODE
-from experiment_logging import Logger
+from experiment_logging import create_logger
 from args import parse_args
 
 import tensorflow_model_optimization as tfmot
 prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
 
 args = parse_args()
-LOGGER = Logger(args.run_description, args)
+LOGGER = create_logger(args.run_description, args)
 
 # TODO:
 # - add args for everything

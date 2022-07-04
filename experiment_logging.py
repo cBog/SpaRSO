@@ -8,6 +8,22 @@ import numpy as np
 from matplotlib import pyplot as plt
 import sys
 
+LOGGER = None
+
+def create_logger(description, args):
+  global LOGGER
+  if LOGGER:
+    raise Exception("LOGGER already created!")
+  else:
+    LOGGER = Logger(description, args)
+    return LOGGER
+
+def get_logger():
+  if not LOGGER:
+    raise Exception("Logger not created!")
+  else:
+    return LOGGER
+
 class Logger:
   LOGS_PATH = "logs"
   LOG_INDEX_FILE_PATH = os.path.join(LOGS_PATH, "log_index.txt")
@@ -37,12 +53,6 @@ class Logger:
       elif res == 'n':
         sys.exit(0)
 
-
-      # repo.head.commit.diff(None)[0].b_path
-      # repo.untracked_files
-      # repo.index.add(['-A'])
-      # 
-      # import pdb; pdb.set_trace()
     assert not repo.is_dirty(), "there are uncommitted changes, cannot execute"
     self.sha = repo.head.object.hexsha
     self.description = description
@@ -56,6 +66,11 @@ class Logger:
     self.id_dir_path = os.path.join(self.LOGS_PATH, self.time_id)
     os.mkdir(self.id_dir_path)
 
+    self.terminal = sys.stdout
+    self.std_out_path = os.path.join(self.id_dir_path, "stdout.txt")
+    self.std_out_file = open(self.std_out_path, "a")
+    sys.stdout = self
+
     # save id: (hash) description to logs/log_index.txt
     log_index_file = open(self.LOG_INDEX_FILE_PATH, 'a')
     log_index_file.write(f"{self.time_id} : ({self.sha}) {description}\n")
@@ -66,13 +81,13 @@ class Logger:
     info_file = open(self.info_log_path, mode='a')
     lines = []
 
-    lines.append(f"### LOG of {self.sha} on {self.time_str}")
-    lines.append(f"id : {self.time_id}")
+    lines.append(f"### LOG of {self.sha} on {self.time_str}\n")
+    lines.append(f"id : {self.time_id}\n")
     lines.append(f"{description}")
-    lines.append("")
-    lines.append(f"ARGS: ")
+    lines.append("\n")
+    lines.append(f"ARGS: \n")
     lines.append(pformat(vars(args)))
-    lines.append("")
+    lines.append("\n")
 
     info_file.writelines(lines)
     info_file.close()
@@ -86,6 +101,14 @@ class Logger:
   #   import pdb; pdb.set_trace()
   #   if self.output_log_file is None and not self.output_log_file.closed:
   #     self.output_log_file.close()
+
+  def write(self, message):
+        self.terminal.write(message)
+        self.std_out_file.write(message)  
+
+  def flush(self):
+      # needed for python 3 compatibility.
+      pass    
 
   def log_model_summary(self, model):
     # add model info to logs/id/info.txt
@@ -106,7 +129,10 @@ class Logger:
     # append a line to the log file
     now = datetime.now()
     date_time_now_str = now.strftime("%H:%M:%S")
-    print(f"{date_time_now_str} [{log_type_str}]: ", file=self.output_log_file)
+    out_str = f"{date_time_now_str} [{log_type_str}]: "
+    self.output_log_file.write(out_str)
+    if log_type_str in self.stdout_log_types:
+      print(out_str)
   
   def save(self, item, name):
     if isinstance(item, (np.ndarray, np.generic)):
