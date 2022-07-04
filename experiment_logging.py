@@ -6,6 +6,7 @@ import pprint
 
 import numpy as np
 from matplotlib import pyplot as plt
+import sys
 
 class Logger:
   LOGS_PATH = "logs"
@@ -13,8 +14,25 @@ class Logger:
 
   def __init__(self, description, args):
     repo = git.Repo(search_parent_directories=True)
-    if repo.is_dirty():
-      print("there are uncommitted changes, cannot execute")
+    while repo.is_dirty() or repo.untracked_files:
+      print("\nThere are uncommitted changes or untracked files, cannot execute!")
+      changed_file_strings = '\n'.join([f"{diff.change_type}:{diff.b_path}" for diff in repo.head.commit.diff(None)])
+      print(f"\nUNCOMMITTED FILES:\n{changed_file_strings}")
+      untracked_file_strings = '\n'.join(repo.untracked_files)
+      print(f"\nUNTRACKED FILES:\n{untracked_file_strings}")
+      res = input(f"\n Would you like to commit them (y/n)?")
+      if res == 'y':
+        repo.index.add([diff.b_path for diff in repo.head.commit.diff(None)])
+        repo.index.add([file for file in repo.untracked_files])
+        repo.index.commit(f"AUTO_RUN: {args.run_description} \n\n from {repo.head.commit.tree.hexsha}")
+      elif res == 'n':
+        sys.exit(0)
+
+
+      # repo.head.commit.diff(None)[0].b_path
+      # repo.untracked_files
+      # repo.index.add(['-A'])
+      # 
       import pdb; pdb.set_trace()
     assert not repo.is_dirty(), "there are uncommitted changes, cannot execute"
     self.sha = repo.head.object.hexsha
@@ -22,7 +40,7 @@ class Logger:
 
     # get id and date time
     now = datetime.now()
-    self.time_id = now.strftime("%Y%m%d_%H%M_{self.sha}")
+    self.time_id = now.strftime(f"%Y%m%d_%H%M_{self.sha}")
     self.time_str = now.strftime("%d/%m/%Y %H:%M:%S")
 
     # make directory in logs/id
