@@ -57,6 +57,8 @@ class Logger:
     self.sha = repo.head.object.hexsha
     self.description = description
 
+    self.stdout_log_types = ["default"]
+
     # get id and date time
     now = datetime.now()
     self.time_id = now.strftime(f"%Y%m%d_%H%M_{self.sha[:10]}")
@@ -108,7 +110,8 @@ class Logger:
 
   def flush(self):
       # needed for python 3 compatibility.
-      pass    
+      self.terminal.flush()
+      self.std_out_file.flush()   
 
   def log_model_summary(self, model):
     # add model info to logs/id/info.txt
@@ -126,6 +129,7 @@ class Logger:
       print(report_string, file=f)
 
   def log(self, text, log_type_str="default"):
+    import pdb; pdb.set_trace()
     # append a line to the log file
     now = datetime.now()
     date_time_now_str = now.strftime("%H:%M:%S")
@@ -133,12 +137,13 @@ class Logger:
     self.output_log_file.write(out_str)
     if log_type_str in self.stdout_log_types:
       print(out_str)
+    self.output_log_file.flush()
   
   def save(self, item, name):
     if isinstance(item, (np.ndarray, np.generic)):
       file_name = f"{os.path.join(self.id_dir_path,name)}.np"
       np.save(file_name, item)
-    elif isinstance(item, pyplot.Figure):
+    elif isinstance(item, plt.Figure):
       file_name = f"{os.path.join(self.id_dir_path,name)}.png"
       item.savefig(file_name)
     else:
