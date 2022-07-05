@@ -128,15 +128,16 @@ class Logger:
       print("FINAL RESULTS:", file=f)
       print(report_string, file=f)
 
-  def log(self, text, log_type_str="default"):
+  def log(self, text, log_type_str="default", flush=False):
     # append a line to the log file
     now = datetime.now()
     date_time_now_str = now.strftime("%H:%M:%S")
     out_str = f"{date_time_now_str} [{log_type_str}]: {text}\n"
     self.output_log_file.write(out_str)
     if log_type_str in self.stdout_log_types:
-      print(out_str)
-    # self.output_log_file.flush()
+      print(out_str, flush=flush)
+    if flush:
+      self.output_log_file.flush()
   
   def save(self, item, name:str):
     if isinstance(item, (np.ndarray, np.generic)):

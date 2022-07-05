@@ -39,10 +39,10 @@ class Optimiser(ABC):
   def run_training(self, dataset):
     raise NotImplementedError()
 
-  def log(self, message: str, level=LOG_LEVEL.INFO):
+  def log(self, message: str, level=LOG_LEVEL.INFO, flush=False):
     # if level != LOG_LEVEL.TRACE:
       # self.log(message,flush=True)
-    self.LOGGER.log(message, level)
+    self.LOGGER.log(message, level, flush=flush)
     # TODO: use a logging API to record all this stuff
 
 class StandardSGD(Optimiser):
