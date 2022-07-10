@@ -52,7 +52,6 @@ def train(optimiser: Optimiser, dataset):
   plt.plot(train_log_np)
   LOGGER.save(fig ,f"training_acc_plot")
 
-# TODO: add all options for these to constructor (e.g. random_order)
 # ["SGD","WsPB_RSO","WPB_RSO","spaRSO"]
 if args.optimiser == "SGD":
   optimiser = StandardSGD(model, epochs=args.epochs)

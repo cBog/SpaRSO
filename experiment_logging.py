@@ -7,6 +7,8 @@ from pprint import pformat
 import numpy as np
 from matplotlib import pyplot as plt
 import sys
+from tensorflow import keras
+import io
 
 LOGGER = None
 
@@ -23,6 +25,20 @@ def get_logger():
     raise Exception("Logger not created!")
   else:
     return LOGGER
+
+class TqdmToLogger(io.StringIO):
+    logger = None
+    buf = ''
+    def __init__(self,logger):
+        super(TqdmToLogger, self).__init__()
+        self.logger = logger
+    def write(self,buf):
+        self.logger.terminal.write(buf)
+        self.buf = buf.strip('\r\n\t ')
+    def flush(self):
+        self.logger.std_out_file.write("\n")
+        self.logger.std_out_file.write(self.buf)
+        self.logger.std_out_file.flush()
 
 class Logger:
   LOGS_PATH = "logs"
@@ -72,6 +88,7 @@ class Logger:
     self.std_out_path = os.path.join(self.id_dir_path, "stdout.txt")
     self.std_out_file = open(self.std_out_path, "a")
     sys.stdout = self
+    sys.stderr = self
 
     # save id: (hash) description to logs/log_index.txt
     log_index_file = open(self.LOG_INDEX_FILE_PATH, 'a')
@@ -97,6 +114,8 @@ class Logger:
     # create logs/id/output.txt
     self.output_log_path = os.path.join(self.id_dir_path,"output.txt")
     self.output_log_file = open(self.output_log_path, mode='a')
+
+    self.tqdm_logger = TqdmToLogger(self)
   
   # TODO: get this working
   # def __del__(self):
@@ -146,10 +165,12 @@ class Logger:
     elif isinstance(item, plt.Figure):
       file_name = f"{os.path.join(self.id_dir_path,name)}.png"
       item.savefig(file_name)
+    elif isinstance(item, keras.Model):
+      file_name = f"{os.path.join(self.id_dir_path,name)}"
+      item.save(file_name)
     else:
       file_name = f"{os.path.join(self.id_dir_path,name)}.pkl"
-      file = open(file_name, mode='w')
-      pickle.dump(item, file)
-      file.close()
+      with open(file_name, mode='wb') as file:
+        pickle.dump(item, file)
 
     self.log(f"saved file {file_name}", "meta")

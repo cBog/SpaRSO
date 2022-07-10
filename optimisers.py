@@ -4,6 +4,7 @@ from keras.utils.layer_utils import count_params
 
 import numpy as np
 from tqdm import tqdm
+import sys
 
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -43,7 +44,6 @@ class Optimiser(ABC):
     # if level != LOG_LEVEL.TRACE:
       # self.log(message,flush=True)
     self.LOGGER.log(message, level, flush=flush)
-    # TODO: use a logging API to record all this stuff
 
 class StandardSGD(Optimiser):
   def __init__(self, model, epochs):
@@ -70,7 +70,7 @@ class StandardSGD(Optimiser):
 
     for epoch in range(self.epochs):
       self.log(f"Epoch {epoch}")
-      for step, (x, y) in tqdm(enumerate(dataset)):
+      for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
         loss = self.train_step_gradients(x, y)
 
       train_acc = self.train_acc_metric.result()
@@ -89,8 +89,6 @@ class WeightPerBatchRSO(Optimiser):
     self.trainable_weight_count = count_params(model.trainable_weights)
     self.number_of_weight_updates = number_of_weight_updates
     self.number_of_batches = self.number_of_weight_updates * self.trainable_weight_count
-    # TODO: this should be 'number_of_weight_updates'
-    # self.epochs = int()
     self.random_update_order = random_update_order
     self.num_model_layers = len(model.layers)
     self.layer_std_devs = {}
@@ -213,7 +211,7 @@ class WeightPerBatchRSO(Optimiser):
     # TODO: tidy this up to loop through weights predominantly and call next on a data iterator manually (i.e. swap the loop around)
     while total_steps < self.number_of_batches:
       self.log(f"Epoch {epochs}")
-      for step, (x, y) in tqdm(enumerate(dataset)):
+      for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
         if total_steps == self.number_of_batches:
           break
         loss = self.train_loop_step(x, y)
@@ -316,7 +314,7 @@ class WeightsPerBatchRSO(Optimiser):
 
     for epoch in range(self.epochs):
       self.log(f"Epoch {epoch}")
-      for step, (x, y) in tqdm(enumerate(dataset)):
+      for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
         loss = self.train_step_rso(x,y)
 
       # TODO: make this every nth
@@ -536,7 +534,22 @@ class SpaRSO(Optimiser):
     self.current_batch = next(self.datasetiter)
     self.num_epochs +=1
     self.log(f"New data epoch reached: {self.num_epochs}")
-    
+  
+  def save_model_state(self, label):
+    self.log(f"saving model status at {label}")
+    self.LOGGER.save(self.model, f"{label}_model")
+
+    state_dict = {}
+    state_dict["flattened_params"] = self.flattened_params
+    state_dict["sparse_mask"] = self.sparse_mask
+    state_dict["active_params"] = self.active_params
+    state_dict["unmasked_indices"] = self.unmasked_indices
+    state_dict["masked_flattened_params"] = self.masked_flattened_params
+
+    self.LOGGER.save(state_dict, f"{label}_statedict")
+
+
+
 
   # TODO: IDEA batch mode with different behaviour for each phase..? or changes during training?
   def get_batch(self):
@@ -578,7 +591,7 @@ class SpaRSO(Optimiser):
 
     # loop through indices in reverse order
     # TODO: add controls for this to permute or change the order, maybe add an order-as-appended mode
-    for i, index in tqdm(enumerate(reversed(self.unmasked_indices)),desc="IMPROVE PHASE"):
+    for i, index in tqdm(enumerate(reversed(self.unmasked_indices)),desc="IMPROVE PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       x, y = self.get_batch()
       choice = WEIGHT_CHOICE.SAME
@@ -660,7 +673,6 @@ class SpaRSO(Optimiser):
       # log the choice somewhere
       self.log(f"weight choice {choice} for index {index}",level=LOG_LEVEL.TRACE)
 
-      # TODO: remove sanity check asserts
       slice_info = self.get_slice_info_from_global_index(index)
     
     self.unmasked_indices = np.delete(self.unmasked_indices, remove_indices_indices_list)
@@ -693,7 +705,7 @@ class SpaRSO(Optimiser):
     self.log(f"max new params = {max_num_new_params} = int({self.maximum_density}*{self.total_params}) - {self.active_params}")
     new_indices = np.random.choice(self.total_params, max_num_new_params, p=prob_dist,replace=False)
 
-    for index in tqdm(new_indices,desc="REGROW PHASE"):
+    for index in tqdm(new_indices,desc="REGROW PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
       if not (self.active_params == (self.sparse_mask>0).sum()):
         import pdb; pdb.set_trace()
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
@@ -736,7 +748,6 @@ class SpaRSO(Optimiser):
       # slice_info.layer.set_weights(layer_weights_list)
       self.train_acc_metric.update_state(y, best_prediction)
 
-      # TODO: remove santity check asserts
       slice_info = self.get_slice_info_from_global_index(index)
 
     self.unmasked_indices = np.sort(self.unmasked_indices)
@@ -759,20 +770,16 @@ class SpaRSO(Optimiser):
     # use p = np.ones(total) - self.mask
     assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
     prob_dist = (np.ones(self.total_params) - self.sparse_mask)/(self.total_params-self.active_params)
-    if not np.isclose(np.sum(prob_dist),1):
-      import pdb; pdb.set_trace()
-    assert np.isclose(np.sum(prob_dist),1), "probability mask does not equal 1"
+    assert np.isclose(np.sum(prob_dist),1), "expecting swap phas prob dist sum to equal 1"
     add_indices = np.random.choice(self.total_params, weights_to_swap, p=prob_dist,replace=False)
-    # TODO: should replace here or no?
 
     # CHOOSE WEIGHTS TO REMOVE
     # use p = self.mask
     prob_dist = self.sparse_mask/self.active_params
     assert np.isclose(np.sum(prob_dist),1), "probability mask does not equal 1"
     remove_indices = np.random.choice(self.total_params, weights_to_swap, p=prob_dist,replace=False)
-    # TODO: should replace here or no?
 
-    for i in tqdm(range(weights_to_swap),desc="REPLACE PHASE"):
+    for i in tqdm(range(weights_to_swap),desc="REPLACE PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
       x, y = self.get_batch()
 
       remove_index = remove_indices[i]
@@ -850,18 +857,25 @@ class SpaRSO(Optimiser):
     self.set_dataset(dataset)
     training_acc_log = []
 
-    for _ in tqdm(range(self.update_iterations)):
+    for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()
+      
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       self.improve_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_improve")
+      
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       self.regrow_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_regrow")
+      
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      self.log("REPLACE TIME", flush=True)#TODO remove this self.log
       self.replace_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_replace")
+      
+      
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()
-      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log("Training acc over iteration: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
 
