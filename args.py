@@ -73,6 +73,12 @@ def parse_args():
         help="Maximum possible fraction of non-zero params"
     )
     parser.add_argument(
+        "--initial-prune-factor",
+        default=0.2,
+        type=float,
+        help="Number of smallest values to prune at start of training (with cosine decayed values to zero afterwards)"
+    )
+    parser.add_argument(
         "--swap-proportion",
         default=0.2,
         type=float,

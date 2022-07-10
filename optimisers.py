@@ -382,11 +382,12 @@ class SpaRSO(Optimiser):
 
 # TODO: handle batch norm....
 
-  def __init__(self, model, initial_density, maximum_density, swap_proportion, update_iterations, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER):
+  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER):
     super(SpaRSO, self).__init__(model)
     self.batch_mode = batch_mode
     self.initial_density = initial_density
     self.maximum_density = maximum_density
+    self.initial_prune_factor = initial_prune_factor
     self.swap_proportion = swap_proportion
     self.update_iterations = update_iterations
     self.consider_zero_improve = consider_zero_improve
@@ -615,6 +616,7 @@ class SpaRSO(Optimiser):
       new_loss, new_prediction = self.forward_pass(x, y)
 
       if new_loss < current_loss:
+        self.log(f"CHOSEN PLUS loss={new_loss}, previous_loss={current_loss}, old_val={new_val}, zero_val={try_val}",level=LOG_LEVEL.TRACE)
         choice = WEIGHT_CHOICE.PLUS_DELTA
         new_val = try_val
         current_loss = new_loss
@@ -629,6 +631,7 @@ class SpaRSO(Optimiser):
       new_loss, new_prediction = self.forward_pass(x, y)
 
       if new_loss < current_loss:
+        self.log(f"CHOSEN MINUS loss={new_loss}, previous_loss={current_loss}, old_val={new_val}, zero_val={try_val}",level=LOG_LEVEL.TRACE)
         choice = WEIGHT_CHOICE.MINUS_DELTA
         new_val = try_val
         current_loss = new_loss
@@ -643,8 +646,10 @@ class SpaRSO(Optimiser):
 
         new_loss, new_prediction = self.forward_pass(x, y)
 
-        if new_loss < current_loss:
-          # self.log("CHOSEN ZERO")
+        # check for zero means that already zero values will be removed here
+        # TODO: wanted to do this with <= check instead but the loss is the same for all of the values in the first iterations!
+        if new_loss < current_loss or new_val==0:
+          self.log(f"CHOSEN ZERO loss={new_loss}, previous_loss={current_loss}, old_val={new_val}, zero_val={try_val}",level=LOG_LEVEL.TRACE)
           choice = WEIGHT_CHOICE.ZERO
           new_val = try_val
           current_loss = new_loss
@@ -655,6 +660,7 @@ class SpaRSO(Optimiser):
         if choice != WEIGHT_CHOICE.ZERO:
           # self.log("ALREADY ZERO")
           choice = WEIGHT_CHOICE.ACCIDENTAL_ZERO
+          #  shouldn't get here when considering zero to improve as new_loss <= current_loss check should be always be true when value is zero
         # TODO: possibly add logic to not do this when masking turned off (if I add that mode)
         else:
           self.sparse_mask[index] = 0
@@ -680,9 +686,51 @@ class SpaRSO(Optimiser):
     return
   
   def prune_phase(self):
-    # prune either with lowest magnitude or using least different between zero and 
+    # prune either with lowest magnitude
+    # TODO: use a smarter metric to decide this
+    
+    # get batch
     self.next_batch_phase_mode()
-    ...
+
+    x, y = self.get_batch()
+    # get current loss
+    current_loss, best_prediction = self.forward_pass(x, y)
+    
+    sorted_indices_desc = np.argsort(np.abs(self.masked_flattened_params))[::-1]
+
+    cosine_decay = 0.5 * (1 + np.cos(np.pi * self.iteration_count / self.update_iterations))
+    pruned_param_factor = self.initial_prune_factor * cosine_decay
+    num_pruned = int(self.active_params * pruned_param_factor)
+
+    indices_to_prune = sorted_indices_desc[self.active_params-num_pruned:self.active_params]
+
+    # remove each indice and run assert checks
+    for remove_index in tqdm(indices_to_prune, desc="PRUNE PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
+      remove_slice_info = self.get_slice_info_from_global_index(remove_index)
+      remove_flattened_weights = remove_slice_info.weights.numpy().flatten()
+      remove_try_val = 0
+      remove_flattened_weights[remove_slice_info.local_idx] = remove_try_val
+      remove_slice_info.weights.assign(remove_flattened_weights.reshape(remove_slice_info.weight_shape))
+      self.sparse_mask[remove_index] = 0
+      self.flattened_params[remove_index] = 0
+      self.masked_flattened_params[remove_index] = 0
+      self.unmasked_indices = self.unmasked_indices[self.unmasked_indices != remove_index]
+      self.active_params -= 1
+      self.log(f"index {remove_index} removed", level=LOG_LEVEL.TRACE)
+      
+      # TODO: remove calls that run these assert checks after update
+      slice_info = self.get_slice_info_from_global_index(remove_index)
+    
+    new_loss, new_prediction = self.forward_pass(x, y)
+
+    # TODO: save weights
+    self.train_acc_metric.update_state(y, new_prediction)
+    self.log(f"REMOVE PHASE: removed {num_pruned} weights; loss before = {current_loss}, loss after = {new_loss}")
+
+    self.unmasked_indices = np.sort(self.unmasked_indices)
+
+    return
+
 
   def regrow_phase(self):
     # try random values for some number of non-masked weights specified by max_params calling get_batch for each
@@ -730,6 +778,7 @@ class SpaRSO(Optimiser):
       new_loss, new_prediction = self.forward_pass(x, y)
 
       if new_loss < current_loss:
+        self.log(f"CHOSEN GROW loss={new_loss}, previous_loss={current_loss}, old_val={new_val}, zero_val={try_val}",level=LOG_LEVEL.TRACE)
         new_val = try_val
         current_loss = new_loss
         best_prediction = new_prediction
@@ -863,6 +912,10 @@ class SpaRSO(Optimiser):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       self.improve_phase()
       self.save_model_state(f"state_iter_{self.iteration_count}_improve")
+
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      self.prune_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_prune")
       
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       self.regrow_phase()
