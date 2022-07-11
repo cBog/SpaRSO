@@ -433,7 +433,7 @@ class SpaRSO(Optimiser):
                 #   import pdb; pdb.set_trace()
                 self.layer_std_devs[layer] = np.std(weights)
                 if self.layer_std_devs[layer] > 0:
-                  self.log(f"layer std dev set to {self.layer_std_devs[layer]}")
+                  self.log(f"layer {layer} std dev set to {self.layer_std_devs[layer]}")
                   break
             assert self.layer_std_devs[layer] > 0, f"layer std dev <= 0 {self.layer_std_devs[layer]}"
 
@@ -477,7 +477,7 @@ class SpaRSO(Optimiser):
     # also some index map integrity checks
     for layer in self.model.layers:
       if layer.trainable_weights:
-        new_weights = []
+        # new_weights = []
         for i, weights in enumerate(layer.trainable_weights):
           slice_index = self.layer_weight_index_map[layer][i]
           shape = weights.shape
@@ -487,10 +487,11 @@ class SpaRSO(Optimiser):
           assert self.global_slice_layer_map[slice_index] == layer, f"slice index to layer map does not equal layer for layer {slice_index} => {self.global_slice_layer_map[slice_index]}<>{layer}"
           slice_start = self.weight_slice_starts[slice_index]
           slice_end = self.weight_slice_ends[slice_index]
-          new_weights.append(self.masked_flattened_params[slice_start:slice_end].reshape(shape))
-        if isinstance(layer, tf.keras.layers.BatchNormalization):
-          import pdb; pdb.set_trace()
-        layer.set_weights(new_weights)
+          weights.assign(self.masked_flattened_params[slice_start:slice_end].reshape(shape))
+          # new_weights.append(self.masked_flattened_params[slice_start:slice_end].reshape(shape))
+        # if isinstance(layer, tf.keras.layers.BatchNormalization):
+        #   import pdb; pdb.set_trace()
+        # layer.set_weights(new_weights)
     
     self.every_iter_batch_flag = True
     self.every_phase_batch_flag = True
