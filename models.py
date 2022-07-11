@@ -21,7 +21,7 @@ class RSO_PAPER_MNIST_MODEL:
       tf.keras.Input(shape=(28,28)),
       tf.keras.layers.Reshape((28,28,1)),
       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
-      # tf.keras.layers.BatchNormalization(),
+      tf.keras.layers.BatchNormalization(),
       tf.keras.layers.ReLU(),
       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
       # tf.keras.layers.BatchNormalization(),
