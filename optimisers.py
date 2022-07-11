@@ -488,6 +488,8 @@ class SpaRSO(Optimiser):
           slice_start = self.weight_slice_starts[slice_index]
           slice_end = self.weight_slice_ends[slice_index]
           new_weights.append(self.masked_flattened_params[slice_start:slice_end].reshape(shape))
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+          import pdb; pdb.set_trace()
         layer.set_weights(new_weights)
     
     self.every_iter_batch_flag = True
