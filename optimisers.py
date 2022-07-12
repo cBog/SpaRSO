@@ -422,7 +422,7 @@ class SpaRSO(Optimiser):
       if layer.trainable_weights:
         # get the std devs for each layer for making random perturbations
         if layer not in self.layer_std_devs:
-            if isinstance(layer, tf.keras.layers.BatchNormalization):
+            if isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization):
               self.layer_std_devs[layer] = 0.1 # TODO: work out what to do for these..
             else:
               # for weights in layer.trainable_weights:
