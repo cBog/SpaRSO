@@ -342,6 +342,15 @@ class WEIGHT_CHOICE(Enum):
   ZERO = 3
   ACCIDENTAL_ZERO = 4
 
+class PHASE_TYPE(Enum):
+  IMPROVE = "improve"
+  PRUNE = "prune"
+  REGROW = "regrow"
+  REPLACE = "replace"
+
+  def __str__(self):
+    return self.value
+
 class SliceInfo(NamedTuple):
   slice_idx: int
   layer: tf.keras.layers.Layer
@@ -382,7 +391,7 @@ class SpaRSO(Optimiser):
 
 # TODO: handle batch norm....
 
-  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER):
+  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
     super(SpaRSO, self).__init__(model)
     self.batch_mode = batch_mode
     self.initial_density = initial_density
@@ -390,6 +399,7 @@ class SpaRSO(Optimiser):
     self.initial_prune_factor = initial_prune_factor
     self.swap_proportion = swap_proportion
     self.update_iterations = update_iterations
+    self.phases = phases
     self.consider_zero_improve = consider_zero_improve
     # TODO: some sort of maximum sparsity schedule
 
@@ -911,23 +921,22 @@ class SpaRSO(Optimiser):
 
     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()
-      
-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      self.improve_phase()
-      self.save_model_state(f"state_iter_{self.iteration_count}_improve")
 
-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      self.prune_phase()
-      self.save_model_state(f"state_iter_{self.iteration_count}_prune")
-      
-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      self.regrow_phase()
-      self.save_model_state(f"state_iter_{self.iteration_count}_regrow")
-      
-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
-      self.replace_phase()
-      self.save_model_state(f"state_iter_{self.iteration_count}_replace")
-      
+      for i,phase in enumerate(self.phases):
+        assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
+        
+        if phase == PHASE_TYPE.IMPROVE:
+          self.improve_phase()
+        elif phase == PHASE_TYPE.PRUNE:
+          self.prune_phase()
+        elif phase == PHASE_TYPE.REGROW:
+          self.regrow_phase()
+        elif phase == PHASE_TYPE.REPLACE:
+          self.replace_phase()
+        else:
+          raise NotImplementedError(f"phase {phase} is not implemented")
+        
+        self.save_model_state(f"state_{self.iteration_count}_{i}_{phase}")
       
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()

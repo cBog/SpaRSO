@@ -60,7 +60,15 @@ elif args.optimiser == "WsPB_RSO":
 elif args.optimiser == "WPB_RSO":
   optimiser = WeightPerBatchRSO(model, number_of_weight_updates=args.opt_iters, random_update_order=args.random_update_order)
 elif args.optimiser == "spaRSO":
-  optimiser = SpaRSO(model, args.initial_density, args.maximum_density, args.initial_prune_factor, args.swap_proportion, args.opt_iters, consider_zero_improve=args.consider_zero_improve, batch_mode=args.batch_mode)
+  optimiser = SpaRSO(model=model, 
+                     initial_density=args.initial_density, 
+                     maximum_density=args.maximum_density, 
+                     initial_prune_factor=args.initial_prune_factor, 
+                     swap_proportion=args.swap_proportion, 
+                     update_iterations=args.opt_iters, 
+                     phases=args.phases,
+                     consider_zero_improve=args.consider_zero_improve, 
+                     batch_mode=args.batch_mode)
 else:
   LOGGER.log("optimiser not implemented")
   exit(1)

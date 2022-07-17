@@ -2,7 +2,7 @@ import argparse
 from xmlrpc.client import boolean
 import numpy as np
 
-from optimisers import BATCH_MODE
+from optimisers import BATCH_MODE, PHASE_TYPE
 from models import NORM_TYPE
 
 def parse_args():
@@ -103,6 +103,14 @@ def parse_args():
         choices=list(NORM_TYPE),
         default=NORM_TYPE.BATCH,
         help="Choose what sort of normalisation layer to use: batch, layer or none"
+    )
+    parser.add_argument(
+        "--phases",
+        type=PHASE_TYPE,
+        choices=list(PHASE_TYPE),
+        default=[PHASE_TYPE.IMPROVE, PHASE_TYPE.PRUNE, PHASE_TYPE.REGROW, PHASE_TYPE.REPLACE],
+        nargs='+',
+        help="list of phase types per iteration"
     )
 
 
