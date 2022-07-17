@@ -3,6 +3,7 @@ from xmlrpc.client import boolean
 import numpy as np
 
 from optimisers import BATCH_MODE
+from models import NORM_TYPE
 
 def parse_args():
     # define experiment configuration args
@@ -95,6 +96,13 @@ def parse_args():
         choices=list(BATCH_MODE),
         default=BATCH_MODE.EVERY_ITER,
         help="Choose whether to sample a new batch of data after every weight update, after every phase or after every full iteration"
+    )
+    parser.add_argument(
+        "--norm-type",
+        type=NORM_TYPE,
+        choices=list(NORM_TYPE),
+        default=NORM_TYPE.BATCH,
+        help="Choose what sort of normalisation layer to use: batch, layer or none"
     )
 
 

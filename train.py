@@ -32,7 +32,7 @@ train_dataset, test_dataset, class_names = get_fashion_mnist(args.batch_size)
 if args.model == "BASIC_FFC":
   model = BasicFFC.get_model()
 elif args.model == "RSO_MNIST":
-  model = RSO_PAPER_MNIST_MODEL.get_model()
+  model = RSO_PAPER_MNIST_MODEL.get_model(args.norm_type)
 else:
   LOGGER.log("model not implemented")
   exit(1)
