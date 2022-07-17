@@ -391,7 +391,7 @@ class SpaRSO(Optimiser):
 
 # TODO: handle batch norm....
 
-  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
+  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, const_norm_weights=False, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
     super(SpaRSO, self).__init__(model)
     self.batch_mode = batch_mode
     self.initial_density = initial_density
@@ -400,6 +400,7 @@ class SpaRSO(Optimiser):
     self.swap_proportion = swap_proportion
     self.update_iterations = update_iterations
     self.phases = phases
+    self.const_norm_weights = const_norm_weights
     self.consider_zero_improve = consider_zero_improve
     # TODO: some sort of maximum sparsity schedule
 
@@ -429,6 +430,8 @@ class SpaRSO(Optimiser):
     # takes each layer, flattens it, concatenate it also record a map from each layer index to the start and end index
     # store also each index to the layer and weight index!
     for layer in self.model.layers:
+      if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
+        continue
       if layer.trainable_weights:
         # get the std devs for each layer for making random perturbations
         if layer not in self.layer_std_devs:
@@ -486,6 +489,8 @@ class SpaRSO(Optimiser):
     # set all weights looping through again using the start/end maps back into the full array
     # also some index map integrity checks
     for layer in self.model.layers:
+      if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
+        continue
       if layer.trainable_weights:
         # new_weights = []
         for i, weights in enumerate(layer.trainable_weights):

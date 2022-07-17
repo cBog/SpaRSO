@@ -110,7 +110,12 @@ def parse_args():
         choices=list(PHASE_TYPE),
         default=[PHASE_TYPE.IMPROVE, PHASE_TYPE.PRUNE, PHASE_TYPE.REGROW, PHASE_TYPE.REPLACE],
         nargs='+',
-        help="list of phase types per iteration"
+        help="List of phase types per iteration"
+    )
+    parser.add_argument(
+        "--const-norm-weights",
+        action='store_true',
+        help="Don't mask and adjust the norm weights and biases (leave as ones and zeros)"
     )
 
 
