@@ -929,21 +929,37 @@ class SpaRSO(Optimiser):
     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()
 
-      for i,phase in enumerate(self.phases):
-        assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      self.improve_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_improve")
+
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      self.prune_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_prune")
+      
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      self.regrow_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_regrow")
+      
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      self.replace_phase()
+      self.save_model_state(f"state_iter_{self.iteration_count}_replace")
+
+      # for i,phase in enumerate(self.phases):
+      #   assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
         
-        if phase == PHASE_TYPE.IMPROVE:
-          self.improve_phase()
-        elif phase == PHASE_TYPE.PRUNE:
-          self.prune_phase()
-        elif phase == PHASE_TYPE.REGROW:
-          self.regrow_phase()
-        elif phase == PHASE_TYPE.REPLACE:
-          self.replace_phase()
-        else:
-          raise NotImplementedError(f"phase {phase} is not implemented")
+      #   if phase == PHASE_TYPE.IMPROVE:
+      #     self.improve_phase()
+      #   elif phase == PHASE_TYPE.PRUNE:
+      #     self.prune_phase()
+      #   elif phase == PHASE_TYPE.REGROW:
+      #     self.regrow_phase()
+      #   elif phase == PHASE_TYPE.REPLACE:
+      #     self.replace_phase()
+      #   else:
+      #     raise NotImplementedError(f"phase {phase} is not implemented")
         
-        self.save_model_state(f"state_{self.iteration_count}_{i}_{phase}")
+      #   self.save_model_state(f"state_{self.iteration_count}_{i}_{phase}")
       
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()
