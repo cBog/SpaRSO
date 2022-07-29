@@ -431,6 +431,7 @@ class SpaRSO(Optimiser):
     # store also each index to the layer and weight index!
     for layer in self.model.layers:
       if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
+        import pdb; pdb.set_trace()
         continue
       if layer.trainable_weights:
         # get the std devs for each layer for making random perturbations
@@ -490,6 +491,7 @@ class SpaRSO(Optimiser):
     # also some index map integrity checks
     for layer in self.model.layers:
       if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
+        import pdb; pdb.set_trace()
         continue
       if layer.trainable_weights:
         # new_weights = []

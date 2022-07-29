@@ -1,0 +1,256 @@
+diff --git a/args.py b/args.py
+index 7aff5d4..a349537 100644
+--- a/args.py
++++ b/args.py
+@@ -2,7 +2,8 @@ import argparse
+ from xmlrpc.client import boolean
+ import numpy as np
+ 
+-from optimisers import BATCH_MODE
++from optimisers import BATCH_MODE, PHASE_TYPE
++from models import NORM_TYPE
+ 
+ def parse_args():
+     # define experiment configuration args
+@@ -96,6 +97,26 @@ def parse_args():
+         default=BATCH_MODE.EVERY_ITER,
+         help="Choose whether to sample a new batch of data after every weight update, after every phase or after every full iteration"
+     )
++    parser.add_argument(
++        "--norm-type",
++        type=NORM_TYPE,
++        choices=list(NORM_TYPE),
++        default=NORM_TYPE.BATCH,
++        help="Choose what sort of normalisation layer to use: batch, layer or none"
++    )
++    parser.add_argument(
++        "--phases",
++        type=PHASE_TYPE,
++        choices=list(PHASE_TYPE),
++        default=[PHASE_TYPE.IMPROVE, PHASE_TYPE.PRUNE, PHASE_TYPE.REGROW, PHASE_TYPE.REPLACE],
++        nargs='+',
++        help="List of phase types per iteration"
++    )
++    parser.add_argument(
++        "--const-norm-weights",
++        action='store_true',
++        help="Don't mask and adjust the norm weights and biases (leave as ones and zeros)"
++    )
+ 
+ 
+ 
+diff --git a/models.py b/models.py
+index fae0e1d..86b9727 100644
+--- a/models.py
++++ b/models.py
+@@ -1,7 +1,17 @@
+ import tensorflow as tf
++from enum import Enum
++
++class NORM_TYPE(Enum):
++  BATCH = "batch"
++  LAYER = "layer"
++  NONE = "none"
++
++  def __str__(self):
++    return self.value
++
+ 
+ class BasicFFC:
+-  def get_model(sparse=False):
++  def get_model():
+     initializer = tf.keras.initializers.GlorotNormal()
+ 
+     model = tf.keras.Sequential([
+@@ -14,31 +24,42 @@ class BasicFFC:
+ 
+ # from: https://arxiv.org/pdf/2005.05955.pdf
+ class RSO_PAPER_MNIST_MODEL:
+-  def get_model(sparse=False):
++  def get_model(norm:NORM_TYPE=NORM_TYPE.BATCH):
+     initializer = tf.keras.initializers.GlorotNormal()
+ 
++    def norm_func():
++      if norm == NORM_TYPE.BATCH:
++        return tf.keras.layers.BatchNormalization()
++      elif norm == NORM_TYPE.LAYER:
++        return tf.keras.layers.LayerNormalization()
++      elif norm == NORM_TYPE.NONE:
++        # defaults to an identify function (noop)
++        return tf.keras.layers.Layer()
++      else:
++        raise NotImplementedError("Norm type not implemented")
++
+     model = tf.keras.Sequential([
+       tf.keras.Input(shape=(28,28)),
+       tf.keras.layers.Reshape((28,28,1)),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.AveragePooling2D(pool_size=(2, 2)),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.AveragePooling2D(pool_size=(2, 2)),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.Conv2D(16, 3, kernel_initializer=initializer, padding="same"),
+-      # tf.keras.layers.BatchNormalization(),
++      norm_func(),
+       tf.keras.layers.ReLU(),
+       tf.keras.layers.GlobalAveragePooling2D(),
+       tf.keras.layers.Flatten(),
+diff --git a/optimisers.py b/optimisers.py
+index 4412af8..0314396 100644
+--- a/optimisers.py
++++ b/optimisers.py
+@@ -342,6 +342,15 @@ class WEIGHT_CHOICE(Enum):
+   ZERO = 3
+   ACCIDENTAL_ZERO = 4
+ 
++class PHASE_TYPE(Enum):
++  IMPROVE = "improve"
++  PRUNE = "prune"
++  REGROW = "regrow"
++  REPLACE = "replace"
++
++  def __str__(self):
++    return self.value
++
+ class SliceInfo(NamedTuple):
+   slice_idx: int
+   layer: tf.keras.layers.Layer
+@@ -382,7 +391,7 @@ class SpaRSO(Optimiser):
+ 
+ # TODO: handle batch norm....
+ 
+-  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER):
++  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, const_norm_weights=False, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
+     super(SpaRSO, self).__init__(model)
+     self.batch_mode = batch_mode
+     self.initial_density = initial_density
+@@ -390,6 +399,8 @@ class SpaRSO(Optimiser):
+     self.initial_prune_factor = initial_prune_factor
+     self.swap_proportion = swap_proportion
+     self.update_iterations = update_iterations
++    self.phases = phases
++    self.const_norm_weights = const_norm_weights
+     self.consider_zero_improve = consider_zero_improve
+     # TODO: some sort of maximum sparsity schedule
+ 
+@@ -419,10 +430,12 @@ class SpaRSO(Optimiser):
+     # takes each layer, flattens it, concatenate it also record a map from each layer index to the start and end index
+     # store also each index to the layer and weight index!
+     for layer in self.model.layers:
++      if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
++        continue
+       if layer.trainable_weights:
+         # get the std devs for each layer for making random perturbations
+         if layer not in self.layer_std_devs:
+-            if isinstance(layer, tf.keras.layers.BatchNormalization):
++            if isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization):
+               self.layer_std_devs[layer] = 0.1 # TODO: work out what to do for these..
+             else:
+               # for weights in layer.trainable_weights:
+@@ -476,6 +489,8 @@ class SpaRSO(Optimiser):
+     # set all weights looping through again using the start/end maps back into the full array
+     # also some index map integrity checks
+     for layer in self.model.layers:
++      if self.const_norm_weights and (isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization)):
++        continue
+       if layer.trainable_weights:
+         # new_weights = []
+         for i, weights in enumerate(layer.trainable_weights):
+@@ -911,23 +926,22 @@ class SpaRSO(Optimiser):
+ 
+     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
+       self.next_batch_iter_mode()
+-      
+-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+-      self.improve_phase()
+-      self.save_model_state(f"state_iter_{self.iteration_count}_improve")
+ 
+-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+-      self.prune_phase()
+-      self.save_model_state(f"state_iter_{self.iteration_count}_prune")
+-      
+-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+-      self.regrow_phase()
+-      self.save_model_state(f"state_iter_{self.iteration_count}_regrow")
+-      
+-      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+-      self.replace_phase()
+-      self.save_model_state(f"state_iter_{self.iteration_count}_replace")
+-      
++      for i,phase in enumerate(self.phases):
++        assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
++        
++        if phase == PHASE_TYPE.IMPROVE:
++          self.improve_phase()
++        elif phase == PHASE_TYPE.PRUNE:
++          self.prune_phase()
++        elif phase == PHASE_TYPE.REGROW:
++          self.regrow_phase()
++        elif phase == PHASE_TYPE.REPLACE:
++          self.replace_phase()
++        else:
++          raise NotImplementedError(f"phase {phase} is not implemented")
++        
++        self.save_model_state(f"state_{self.iteration_count}_{i}_{phase}")
+       
+       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+       train_acc = self.train_acc_metric.result()
+diff --git a/run_sparso.sh b/run_sparso.sh
+index 21a7cb8..a7f5389 100755
+--- a/run_sparso.sh
++++ b/run_sparso.sh
+@@ -3,5 +3,5 @@
+ description="${@:1}"
+ echo $description
+ 
+-python train.py --run-description "${description}" --batch-size 1024 --optimiser spaRSO --opt-iters 50 --initial-density 0.05 --maximum-density 0.25 --initial-prune-factor 0.2 --swap-proportion 0.2 --consider-zero-improve --batch-mode every_iteration
++python train.py --run-description "${description}" --batch-size 1024 --optimiser spaRSO --opt-iters 50 --initial-density 0.05 --maximum-density 0.25 --initial-prune-factor 0.2 --swap-proportion 0.2 --consider-zero-improve --batch-mode every_iteration --norm-type none --const-norm-weights --phases improve prune regrow replace
+ 
+diff --git a/train.py b/train.py
+index ea3a93a..66a57f2 100644
+--- a/train.py
++++ b/train.py
+@@ -32,7 +32,7 @@ train_dataset, test_dataset, class_names = get_fashion_mnist(args.batch_size)
+ if args.model == "BASIC_FFC":
+   model = BasicFFC.get_model()
+ elif args.model == "RSO_MNIST":
+-  model = RSO_PAPER_MNIST_MODEL.get_model()
++  model = RSO_PAPER_MNIST_MODEL.get_model(args.norm_type)
+ else:
+   LOGGER.log("model not implemented")
+   exit(1)
+@@ -60,7 +60,16 @@ elif args.optimiser == "WsPB_RSO":
+ elif args.optimiser == "WPB_RSO":
+   optimiser = WeightPerBatchRSO(model, number_of_weight_updates=args.opt_iters, random_update_order=args.random_update_order)
+ elif args.optimiser == "spaRSO":
+-  optimiser = SpaRSO(model, args.initial_density, args.maximum_density, args.initial_prune_factor, args.swap_proportion, args.opt_iters, consider_zero_improve=args.consider_zero_improve, batch_mode=args.batch_mode)
++  optimiser = SpaRSO(model=model, 
++                     initial_density=args.initial_density, 
++                     maximum_density=args.maximum_density, 
++                     initial_prune_factor=args.initial_prune_factor, 
++                     swap_proportion=args.swap_proportion, 
++                     update_iterations=args.opt_iters, 
++                     phases=args.phases,
++                     const_norm_weights=args.const_norm_weights,
++                     consider_zero_improve=args.consider_zero_improve, 
++                     batch_mode=args.batch_mode)
+ else:
+   LOGGER.log("optimiser not implemented")
+   exit(1)
