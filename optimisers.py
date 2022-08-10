@@ -26,11 +26,13 @@ class Optimiser(ABC):
     self.train_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy()
     self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     self.model = model
+    self.forward_count = 0
 
   @tf.function
   def forward_pass(self, x, y):
     prediction = self.model(x, training=True)
     loss = self.loss_fn(y, prediction)
+    self.forward_count += 1
     return loss, prediction
 
   def get_delta_weight(self, layer_std_dev):
@@ -80,7 +82,7 @@ class StandardSGD(Optimiser):
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
-    return training_acc_log
+    return training_acc_log, []
 
 class WeightPerBatchRSO(Optimiser):
   def __init__(self, model, number_of_weight_updates, random_update_order=False):
@@ -205,6 +207,7 @@ class WeightPerBatchRSO(Optimiser):
 
   def run_training(self, dataset):
     training_acc_log = []
+    training_forwards_log = []
 
     total_steps = 0
     epochs = 0
@@ -224,10 +227,11 @@ class WeightPerBatchRSO(Optimiser):
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
+      training_forwards_log.append(self.forward_count)
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
-    return training_acc_log
+    return training_acc_log, training_forwards_log
 
 class WeightsPerBatchRSO(Optimiser):
   def __init__(self, model, epochs, max_weight_per_iter=np.Inf, random_update_order=False):
@@ -311,6 +315,7 @@ class WeightsPerBatchRSO(Optimiser):
 
   def run_training(self, dataset):
     training_acc_log = []
+    training_forwards_log = []
 
     for epoch in range(self.epochs):
       self.log(f"Epoch {epoch}")
@@ -322,10 +327,11 @@ class WeightsPerBatchRSO(Optimiser):
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
       training_acc_log.append(train_acc)
+      training_forwards_log.append(self.forward_count)
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
-    return training_acc_log
+    return training_acc_log, training_forwards_log
 
 class BATCH_MODE(Enum):
   EVERY_WEIGHT = "every_weight"
@@ -923,6 +929,7 @@ class SpaRSO(Optimiser):
   def run_training(self, dataset):
     self.set_dataset(dataset)
     training_acc_log = []
+    training_forwards_log = []
 
     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()
@@ -946,12 +953,14 @@ class SpaRSO(Optimiser):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over iteration: %.4f" % (float(train_acc),))
+      self.log(f"Number of forward passes {self.forward_count}")
 
       training_acc_log.append(train_acc)
+      training_forwards_log.append(self.forward_count)
 
       # Reset training metrics at the end of each full iterations
       self.train_acc_metric.reset_states()
-    return training_acc_log
+    return training_acc_log, training_forwards_log
 
     # TODO: add logs and training metrics
     

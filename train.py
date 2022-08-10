@@ -40,10 +40,12 @@ else:
 LOGGER.log_model_summary(model)
 
 def train(optimiser: Optimiser, dataset):
-  training_acc_log = optimiser.run_training(dataset)
+  training_acc_log, training_forwards_log = optimiser.run_training(dataset)
   
   train_log_np = np.array(training_acc_log)
   LOGGER.save(train_log_np, f"training_acc_results")
+  train_fwds_log_np = np.array(training_forwards_log)
+  LOGGER.save(train_fwds_log_np, f"training_forwards_counts")
 
   fig = plt.figure()
   plt.title("Training accuracy every epoch of data") 
@@ -83,6 +85,8 @@ model.compile(optimizer='adam',
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
 LOGGER.log_eval_results(test_loss, test_acc)
+
+LOGGER.log(f"Number of forward passes: {optimiser.forward_count}")
 
 is_pruning = False
 
