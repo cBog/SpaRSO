@@ -27,6 +27,7 @@ class Optimiser(ABC):
     self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     self.model = model
     self.forward_count = 0
+    self.val_acc_log = []
 
   @tf.function
   def forward_pass(self, x, y):
@@ -48,6 +49,7 @@ class Optimiser(ABC):
               metrics=['accuracy'])
 
     test_loss, test_acc = self.model.evaluate(test_data, verbose=2)
+    self.val_acc_log.append(test_acc)
     self.LOGGER.log_eval_results(test_loss, test_acc)
 
   def log(self, message: str, level=LOG_LEVEL.INFO, flush=False):
@@ -105,7 +107,7 @@ class StandardSGD(Optimiser):
       self.train_acc_metric.reset_states()
       self.evaluate(test_data)
     # import pdb; pdb.set_trace()
-    return training_acc_log, []
+    return training_acc_log, [], self.val_acc_log
 
 class WeightPerBatchRSO(Optimiser):
   def __init__(self, model, number_of_weight_updates, random_update_order=False):
@@ -277,7 +279,7 @@ class WeightPerBatchRSO(Optimiser):
 
       # # Reset training metrics at the end of each epoch
       # self.train_acc_metric.reset_states()
-    return self.training_acc_log, self.training_forwards_log
+    return self.training_acc_log, self.training_forwards_log, self.val_acc_log
 
 class WeightsPerBatchRSO(Optimiser):
   def __init__(self, model, epochs, max_weight_per_iter=np.Inf, random_update_order=False):
@@ -377,7 +379,7 @@ class WeightsPerBatchRSO(Optimiser):
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
-    return training_acc_log, training_forwards_log
+    return training_acc_log, training_forwards_log, self.val_acc_log
 
 class BATCH_MODE(Enum):
   EVERY_WEIGHT = "every_weight"
@@ -1007,7 +1009,7 @@ class SpaRSO(Optimiser):
       # Reset training metrics at the end of each full iterations
       self.train_acc_metric.reset_states()
       self.evaluate(test_data)
-    return training_acc_log, training_forwards_log
+    return training_acc_log, training_forwards_log, self.val_acc_log
 
     # TODO: add logs and training metrics
     

@@ -43,11 +43,13 @@ model.compile(optimizer='adam',
 
 LOGGER.log_model_summary(model)
 
-def train(optimiser: Optimiser, dataset):
-  training_acc_log, training_forwards_log = optimiser.run_training(dataset)
+def train(optimiser: Optimiser, dataset, test_dataset):
+  training_acc_log, training_forwards_log, val_acc_log = optimiser.run_training(dataset, test_dataset)
   
   train_log_np = np.array(training_acc_log)
   LOGGER.save(train_log_np, f"training_acc_results")
+  val_log_np = np.array(val_acc_log)
+  LOGGER.save(val_log_np, f"val_acc_results")
   train_fwds_log_np = np.array(training_forwards_log)
   LOGGER.save(train_fwds_log_np, f"training_forwards_counts")
 
@@ -57,6 +59,13 @@ def train(optimiser: Optimiser, dataset):
   plt.ylabel("Training accuracy") 
   plt.plot(train_log_np)
   LOGGER.save(fig ,f"training_acc_plot")
+
+  fig = plt.figure()
+  plt.title("Validation accuracy every epoch/cycle") 
+  plt.xlabel("Epochs/Cycles") 
+  plt.ylabel("Validation Accuracy") 
+  plt.plot(val_log_np)
+  LOGGER.save(fig ,f"validation_acc_plot")
   return optimiser.model
 
 # ["SGD","WsPB_RSO","WPB_RSO","spaRSO"]
