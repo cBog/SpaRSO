@@ -219,7 +219,7 @@ class WeightPerBatchRSO(Optimiser):
       flattened_weights[i] = try_val
       # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
       # layer.set_weights(layer_weights_list)
-      layer_weights.assign(flattened_weights.reshape(weights_shape))
+      layer.weights[self.w_idx].assign(flattened_weights.reshape(weights_shape))
 
       # new_prediction = model(x, training=True)
       # new_loss = loss_fn(y, new_prediction)
@@ -234,7 +234,7 @@ class WeightPerBatchRSO(Optimiser):
       flattened_weights[i] = try_val
       # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
       # layer.set_weights(layer_weights_list)
-      layer_weights.assign(flattened_weights.reshape(weights_shape))
+      layer.weights[self.w_idx].assign(flattened_weights.reshape(weights_shape))
 
       # new_prediction = model(x, training=True)
       # new_loss = loss_fn(y, new_prediction)
@@ -248,7 +248,7 @@ class WeightPerBatchRSO(Optimiser):
       flattened_weights[i] = new_val
       # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
       # layer.set_weights(layer_weights_list)
-      layer_weights.assign(flattened_weights.reshape(weights_shape))
+      layer.weights[self.w_idx].assign(flattened_weights.reshape(weights_shape))
 
     self.train_acc_metric.update_state(y, best_prediction)
       
