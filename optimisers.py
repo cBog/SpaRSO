@@ -86,14 +86,20 @@ class StandardSGD(Optimiser):
       for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
         loss = self.train_step_gradients(x, y)
 
+      import pdb; pdb.set_trace()
       self.save_model_state(f"state_{epoch}", {"epoch": epoch})
+      import pdb; pdb.set_trace()
       train_acc = self.train_acc_metric.result()
+      import pdb; pdb.set_trace()
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+      import pdb; pdb.set_trace()
 
       training_acc_log.append(train_acc)
+      import pdb; pdb.set_trace()
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
+      import pdb; pdb.set_trace()
     # import pdb; pdb.set_trace()
     return training_acc_log, []
 
