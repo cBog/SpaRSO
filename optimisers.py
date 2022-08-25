@@ -39,8 +39,16 @@ class Optimiser(ABC):
     return np.random.normal(0.0, layer_std_dev)
 
   @abstractmethod
-  def run_training(self, dataset):
+  def run_training(self, dataset, test_data):
     raise NotImplementedError()
+
+  def evaluate(self, test_data):
+    self.model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+    test_loss, test_acc = self.model.evaluate(test_data, verbose=2)
+    self.LOGGER.log_eval_results(test_loss, test_acc)
 
   def log(self, message: str, level=LOG_LEVEL.INFO, flush=False):
     # if level != LOG_LEVEL.TRACE:
@@ -79,7 +87,7 @@ class StandardSGD(Optimiser):
     self.train_acc_metric.update_state(y, prediction)
     return loss
 
-  def run_training(self, dataset):
+  def run_training(self, dataset, test_data):
     training_acc_log = []
 
     for epoch in range(self.epochs):
@@ -95,6 +103,7 @@ class StandardSGD(Optimiser):
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
+      self.evaluate(test_data)
     # import pdb; pdb.set_trace()
     return training_acc_log, []
 
@@ -154,6 +163,7 @@ class WeightPerBatchRSO(Optimiser):
 
           # Reset training metrics at the end of each epoch
           self.train_acc_metric.reset_states()
+          self.evaluate(self.test_data)
         else:
           self.layers_idx -= 1
         self.w_idx = len(self.model.layers[self.layers_idx].get_weights()) - 1
@@ -243,7 +253,8 @@ class WeightPerBatchRSO(Optimiser):
     self.loop_state_step()
     return current_loss
 
-  def run_training(self, dataset):
+  def run_training(self, dataset, test_data):
+    self.test_data = test_data
     self.total_steps = 0
     self.epochs = 0
     # TODO: tidy this up to loop through weights predominantly and call next on a data iterator manually (i.e. swap the loop around)
@@ -348,7 +359,7 @@ class WeightsPerBatchRSO(Optimiser):
     self.train_acc_metric.update_state(y, best_prediction)
     return current_loss
 
-  def run_training(self, dataset):
+  def run_training(self, dataset, test_data):
     training_acc_log = []
     training_forwards_log = []
 
@@ -961,7 +972,7 @@ class SpaRSO(Optimiser):
 
     return
 
-  def run_training(self, dataset):
+  def run_training(self, dataset, test_data):
     self.set_dataset(dataset)
     training_acc_log = []
     training_forwards_log = []
@@ -995,6 +1006,7 @@ class SpaRSO(Optimiser):
 
       # Reset training metrics at the end of each full iterations
       self.train_acc_metric.reset_states()
+      self.evaluate(test_data)
     return training_acc_log, training_forwards_log
 
     # TODO: add logs and training metrics
