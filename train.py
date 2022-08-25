@@ -37,10 +37,6 @@ else:
   LOGGER.log("model not implemented")
   exit(1)
 
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-
 LOGGER.log_model_summary(model)
 
 def train(optimiser: Optimiser, dataset):
@@ -83,7 +79,13 @@ else:
 
 model = train(optimiser, train_dataset)
 # import pdb; pdb.set_trace()
+
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
+
 
 LOGGER.log_eval_results(test_loss, test_acc)
 
