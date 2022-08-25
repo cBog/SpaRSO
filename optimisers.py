@@ -94,7 +94,7 @@ class StandardSGD(Optimiser):
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     return training_acc_log, []
 
 class WeightPerBatchRSO(Optimiser):

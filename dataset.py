@@ -20,6 +20,6 @@ def get_fashion_mnist(batch_size):
     test_dataset = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
 
     train_dataset = train_dataset.map(scale).shuffle(BUFFER_SIZE).batch(batch_size)
-    test_dataset = test_dataset.map(scale).batch(batch_size)
+    test_dataset = test_dataset.map(scale).batch(1)
 
     return train_dataset, test_dataset, class_names

@@ -82,7 +82,7 @@ else:
   exit(1)
 
 model = train(optimiser, train_dataset)
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
 LOGGER.log_eval_results(test_loss, test_acc)
