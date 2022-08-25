@@ -81,7 +81,7 @@ else:
   LOGGER.log("optimiser not implemented")
   exit(1)
 
-model = train(optimiser, train_dataset)
+model = train(optimiser, train_dataset, test_dataset)
 # import pdb; pdb.set_trace()
 
 model.compile(optimizer='adam',
