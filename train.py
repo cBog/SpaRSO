@@ -40,7 +40,7 @@ else:
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
-              
+
 LOGGER.log_model_summary(model)
 
 def train(optimiser: Optimiser, dataset):
@@ -57,6 +57,7 @@ def train(optimiser: Optimiser, dataset):
   plt.ylabel("Training accuracy") 
   plt.plot(train_log_np)
   LOGGER.save(fig ,f"training_acc_plot")
+  return optimiser.model
 
 # ["SGD","WsPB_RSO","WPB_RSO","spaRSO"]
 if args.optimiser == "SGD":
@@ -80,7 +81,7 @@ else:
   LOGGER.log("optimiser not implemented")
   exit(1)
 
-train(optimiser, train_dataset)
+model = train(optimiser, train_dataset)
 
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
