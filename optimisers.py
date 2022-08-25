@@ -141,9 +141,9 @@ class WeightPerBatchRSO(Optimiser):
   
   def print_loop_state(self):
     if self.LOGGING:
-      self.log(f"LOOP STATE: layer: {self.layers_idx}, weights: {self.w_idx}, idx: {self.idx}")
+      self.log(f"LOOP STATE: layer: {self.layers_idx}, weights: {self.w_idx}, idx: {self.idx}", LOG_LEVEL.TRACE)
       if self.permutation is not None:
-        self.log(f"permutations: [{self.permutation[0]}, {self.permutation[1]},{self.permutation[2]}, ...)")
+        self.log(f"permutations: [{self.permutation[0]}, {self.permutation[1]},{self.permutation[2]}, ...)",LOG_LEVEL.TRACE)
 
   def loop_state_step(self):
     # decrement indices
