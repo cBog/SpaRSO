@@ -7,7 +7,7 @@ BUFFER_SIZE = 1024
 def scale(image, label):
   image = tf.cast(image, tf.float32)
   image /= 255
-  # label = tf.cast(label, tf.int32)
+  label = tf.cast(label, tf.int32)
 
   return image, label
 
