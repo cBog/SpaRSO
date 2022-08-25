@@ -63,7 +63,7 @@ class StandardSGD(Optimiser):
     super(StandardSGD, self).__init__(model)
     self.epochs = epochs
     # self.sgd_optimiser = tf.keras.optimizers.Adam(0.001)
-    self.sgd_optimiser = tf.keras.optimizers.Adam(0.006)
+    self.sgd_optimiser = tf.keras.optimizers.Adam(0.03)
 
   @tf.function
   def train_step_gradients(self, x, y):
