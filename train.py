@@ -76,11 +76,11 @@ else:
   LOGGER.log("optimiser not implemented")
   exit(1)
 
-train(optimiser, train_dataset)
-
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
+
+train(optimiser, train_dataset)
 
 test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
@@ -97,9 +97,10 @@ if is_pruning:
   end_step = np.ceil(num_batches).astype(np.int32) * pruning_epochs
 
   # Define model for pruning.
+  # from https://www.tensorflow.org/model_optimization/guide/pruning/pruning_with_keras
   pruning_params = {
-        'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
-                                                                final_sparsity=0.80,
+        'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=args.pruning_min,
+                                                                final_sparsity=args.pruning_max,
                                                                 begin_step=0,
                                                                 end_step=end_step)
   }
@@ -114,7 +115,7 @@ if is_pruning:
   model_for_pruning.summary()
   callbacks = [
     tfmot.sparsity.keras.UpdatePruningStep(),
-    # tfmot.sparsity.keras.PruningSummaries(log_dir=logdir),
+    tfmot.sparsity.keras.PruningSummaries(),
   ]
 
   model_for_pruning.fit(train_dataset,
@@ -122,4 +123,7 @@ if is_pruning:
                     callbacks=callbacks)
 
   test_loss, test_acc = model_for_pruning.evaluate(test_dataset, verbose=2)
+
+  LOGGER.log(f"EVAL AFTER PRUNING FROM {args.pruning_min} TO {args.pruning_max}")
+  LOGGER.log_eval_results(test_loss, test_acc)
 

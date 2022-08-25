@@ -31,6 +31,19 @@ def parse_args():
         action='store_true',
         help="Run low magnitude pruning training phase with a PolynomialDecay schedule"
     )
+    parser.add_argument(
+        "--pruning-min",
+        default=0.5,
+        type=float,
+        help="Initialised pruning factor (% weights pruned) at start of polynomial decay low magnitude pruning phase"
+    )
+    parser.add_argument(
+        "--pruning-max",
+        default=0.8,
+        type=float,
+        help="Max pruning factor (% weights pruned) at end of polynomial decay low magnitude pruning phase"
+    )
+
 
 
     # SGD ARGS

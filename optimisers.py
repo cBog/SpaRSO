@@ -47,6 +47,17 @@ class Optimiser(ABC):
       # self.log(message,flush=True)
     self.LOGGER.log(message, level, flush=flush)
 
+  def save_model_state(self, label, state_dict_in):
+    self.log(f"saving model status at {label}")
+    self.LOGGER.save(self.model, f"{label}_model")
+
+    state_dict = {}
+    state_dict["forward_count"] = self.forward_count
+    state_dict.update(state_dict_in)
+
+    self.LOGGER.save(state_dict, f"{label}_statedict")
+
+
 class StandardSGD(Optimiser):
   def __init__(self, model, epochs):
     super(StandardSGD, self).__init__(model)
@@ -75,6 +86,7 @@ class StandardSGD(Optimiser):
       for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
         loss = self.train_step_gradients(x, y)
 
+      self.save_model_state(f"state_{epoch}", {"epoch": epoch})
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
@@ -95,6 +107,9 @@ class WeightPerBatchRSO(Optimiser):
     self.num_model_layers = len(model.layers)
     self.layer_std_devs = {}
     self.init_loop_state()
+    self.training_acc_log = []
+    self.training_forwards_log = []
+    self.count_weight_iters = 0
 
   def init_loop_state(self):
     self.layers_idx = self.num_model_layers - 1
@@ -124,6 +139,19 @@ class WeightPerBatchRSO(Optimiser):
         if self.layers_idx <= 0:
           self.layers_idx = self.num_model_layers - 1
           self.log(f"reset layer index to {self.layers_idx}")
+          train_acc = self.train_acc_metric.result()
+          self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+
+          self.training_acc_log.append(train_acc)
+          self.training_forwards_log.append(self.forward_count)
+          self.save_model_state(f"state_{self.count_weight_iters}", 
+                                {"count_weight_iters" : self.count_weight_iters, 
+                                 "total_steps" : self.total_steps, 
+                                 "epochs" : self.epochs})
+          self.count_weight_iters += 1
+
+          # Reset training metrics at the end of each epoch
+          self.train_acc_metric.reset_states()
         else:
           self.layers_idx -= 1
         self.w_idx = len(self.model.layers[self.layers_idx].get_weights()) - 1
@@ -166,12 +194,18 @@ class WeightPerBatchRSO(Optimiser):
       og_val = flattened_weights[i]
       new_val = og_val
       
-      delta_weight = self.get_delta_weight(self.layer_std_devs[layer])
+      # as per paper: for stdevs, they "linearly anneal the standard deviation σcdat a cycle
+      # c of the sampling distribution for layer d, such that thestandard deviation at the 
+      # final cycle C is σCd = σ1d/10."
+      # equivalent to between σCd and σCd - (0.9 * σCd)
+      stddev = self.layer_std_devs[layer] - (0.9 * self.layer_std_devs[layer] * (self.count_weight_iters/(self.number_of_weight_updates-1)))
+      delta_weight = self.get_delta_weight(stddev)
 
       try_val = og_val + delta_weight
       flattened_weights[i] = try_val
-      layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
-      layer.set_weights(layer_weights_list)
+      # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
+      # layer.set_weights(layer_weights_list)
+      layer_weights.assign(flattened_weights.reshape(weights_shape))
 
       # new_prediction = model(x, training=True)
       # new_loss = loss_fn(y, new_prediction)
@@ -184,8 +218,9 @@ class WeightPerBatchRSO(Optimiser):
 
       try_val = og_val - delta_weight
       flattened_weights[i] = try_val
-      layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
-      layer.set_weights(layer_weights_list)
+      # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
+      # layer.set_weights(layer_weights_list)
+      layer_weights.assign(flattened_weights.reshape(weights_shape))
 
       # new_prediction = model(x, training=True)
       # new_loss = loss_fn(y, new_prediction)
@@ -197,8 +232,9 @@ class WeightPerBatchRSO(Optimiser):
         best_prediction = new_prediction
       
       flattened_weights[i] = new_val
-      layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
-      layer.set_weights(layer_weights_list)
+      # layer_weights_list[self.w_idx] = flattened_weights.reshape(weights_shape)
+      # layer.set_weights(layer_weights_list)
+      layer_weights.assign(flattened_weights.reshape(weights_shape))
 
     self.train_acc_metric.update_state(y, best_prediction)
       
@@ -206,32 +242,29 @@ class WeightPerBatchRSO(Optimiser):
     return current_loss
 
   def run_training(self, dataset):
-    training_acc_log = []
-    training_forwards_log = []
-
-    total_steps = 0
-    epochs = 0
+    self.total_steps = 0
+    self.epochs = 0
     # TODO: tidy this up to loop through weights predominantly and call next on a data iterator manually (i.e. swap the loop around)
-    while total_steps < self.number_of_batches:
-      self.log(f"Epoch {epochs}")
+    while self.total_steps < self.number_of_batches:
+      self.log(f"Epoch {self.epochs}")
       for step, (x, y) in tqdm(enumerate(dataset),file=self.LOGGER.tqdm_logger,mininterval=30):
-        if total_steps == self.number_of_batches:
+        if (self.total_steps + step) == self.number_of_batches:
           break
         loss = self.train_loop_step(x, y)
       
-      total_steps += step
-      epochs += 1
+      self.total_steps += step
+      self.epochs += 1
 
       # TODO: make this every nth or after every weight iter?
-      train_acc = self.train_acc_metric.result()
-      self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+      # train_acc = self.train_acc_metric.result()
+      # self.log("Training acc over epoch: %.4f" % (float(train_acc),))
 
-      training_acc_log.append(train_acc)
-      training_forwards_log.append(self.forward_count)
+      # training_acc_log.append(train_acc)
+      # training_forwards_log.append(self.forward_count)
 
-      # Reset training metrics at the end of each epoch
-      self.train_acc_metric.reset_states()
-    return training_acc_log, training_forwards_log
+      # # Reset training metrics at the end of each epoch
+      # self.train_acc_metric.reset_states()
+    return self.training_acc_log, self.training_forwards_log
 
 class WeightsPerBatchRSO(Optimiser):
   def __init__(self, model, epochs, max_weight_per_iter=np.Inf, random_update_order=False):
@@ -561,8 +594,8 @@ class SpaRSO(Optimiser):
     self.log(f"New data epoch reached: {self.num_epochs}")
   
   def save_model_state(self, label):
-    self.log(f"saving model status at {label}")
-    self.LOGGER.save(self.model, f"{label}_model")
+    # self.log(f"saving model status at {label}")
+    # self.LOGGER.save(self.model, f"{label}_model")
 
     state_dict = {}
     state_dict["flattened_params"] = self.flattened_params
@@ -570,8 +603,8 @@ class SpaRSO(Optimiser):
     state_dict["active_params"] = self.active_params
     state_dict["unmasked_indices"] = self.unmasked_indices
     state_dict["masked_flattened_params"] = self.masked_flattened_params
-
-    self.LOGGER.save(state_dict, f"{label}_statedict")
+    super().save_model_state(label, state_dict)
+    # self.LOGGER.save(state_dict, f"{label}_statedict")
 
 
 
