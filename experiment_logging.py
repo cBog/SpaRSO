@@ -73,7 +73,7 @@ class Logger:
     self.sha = repo.head.object.hexsha
     self.description = description
 
-    self.stdout_log_types = ["default","INFO"]
+    self.stdout_log_types = ["default","INFO", "info"]
 
     # get id and date time
     now = datetime.now()
