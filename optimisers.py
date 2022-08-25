@@ -55,7 +55,7 @@ class Optimiser(ABC):
   def log(self, message: str, level=LOG_LEVEL.INFO, flush=False):
     # if level != LOG_LEVEL.TRACE:
       # self.log(message,flush=True)
-    self.LOGGER.log(message, level, flush=flush)
+    self.LOGGER.log(message, str(level), flush=flush)
 
   def save_model_state(self, label, state_dict_in):
     self.log(f"saving model status at {label}")
