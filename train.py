@@ -10,11 +10,18 @@ from models import BasicFFC, RSO_PAPER_MNIST_MODEL
 from optimisers import SpaRSO, StandardSGD, WeightPerBatchRSO, WeightsPerBatchRSO, Optimiser, BATCH_MODE
 from experiment_logging import create_logger
 from args import parse_args
-
+from numpy.random import seed
 import tensorflow_model_optimization as tfmot
+import random
+
 prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
 
 args = parse_args()
+
+random.seed(args.seed)
+seed(args.seed)
+tf.random.set_seed(args.seed)
+
 LOGGER = create_logger(args.run_description, args)
 
 # TODO:

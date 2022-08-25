@@ -43,6 +43,11 @@ def parse_args():
         type=float,
         help="Max pruning factor (% weights pruned) at end of polynomial decay low magnitude pruning phase"
     )
+    parser.add_argument(
+        "--seed",
+        default=42,
+        type=int
+    )
 
 
 

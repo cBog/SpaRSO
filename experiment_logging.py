@@ -153,6 +153,8 @@ class Logger:
     date_time_now_str = now.strftime("%H:%M:%S")
     out_str = f"{date_time_now_str} [{log_type_str}]: {text}\n"
     self.output_log_file.write(out_str)
+    if log_type_str == "info":
+      import pdb; pdb.set_trace()
     if log_type_str in self.stdout_log_types:
       print(out_str, flush=flush)
     if flush:
