@@ -37,6 +37,10 @@ else:
   LOGGER.log("model not implemented")
   exit(1)
 
+model.compile(optimizer='adam',
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+              
 LOGGER.log_model_summary(model)
 
 def train(optimiser: Optimiser, dataset):
@@ -75,10 +79,6 @@ elif args.optimiser == "spaRSO":
 else:
   LOGGER.log("optimiser not implemented")
   exit(1)
-
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
 
 train(optimiser, train_dataset)
 
