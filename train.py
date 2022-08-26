@@ -138,7 +138,7 @@ if is_pruning:
   model_for_pruning.summary()
   callbacks = [
     tfmot.sparsity.keras.UpdatePruningStep(),
-    tfmot.sparsity.keras.PruningSummaries(),
+    tfmot.sparsity.keras.PruningSummaries(log_dir=LOGGER.id_dir_path),
   ]
 
   model_for_pruning.fit(train_dataset,
