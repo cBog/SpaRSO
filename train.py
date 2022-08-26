@@ -111,7 +111,7 @@ LOGGER.log_eval_results(test_loss, test_acc)
 
 LOGGER.log(f"Number of forward passes: {optimiser.forward_count}")
 
-is_pruning = False
+is_pruning = args.run_classic_pruning
 
 if is_pruning:
   LOGGER.log("PRUNING TIME")
