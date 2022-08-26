@@ -606,7 +606,7 @@ class SpaRSO(Optimiser):
     self.datasetiter = iter(self.dataset)
     self.current_batch = next(self.datasetiter)
     self.num_epochs +=1
-    self.log(f"New data epoch reached: {self.num_epochs}")
+    self.log(f"New data epoch reached: {self.num_epochs}", level=LOG_LEVEL.TRACE)
   
   def save_model_state(self, label):
     # self.log(f"saving model status at {label}")
@@ -647,7 +647,7 @@ class SpaRSO(Optimiser):
       self.reset_iter()
 
     assert self.current_batch, "Current batch is None after get batch call"
-    
+
     return self.current_batch
   
   def next_batch_phase_mode(self):
