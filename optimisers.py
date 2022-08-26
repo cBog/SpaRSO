@@ -627,22 +627,27 @@ class SpaRSO(Optimiser):
   # TODO: IDEA batch mode with different behaviour for each phase..? or changes during training?
   def get_batch(self):
     # return new batch each time or same batch based on some count or conditions
-    if self.batch_mode == BATCH_MODE.EVERY_WEIGHT:
-      # always call next
-      self.current_batch = next(self.datasetiter)
-    elif self.batch_mode == BATCH_MODE.EVERY_PHASE:
-      # if every_phase flag set, call next and set flag false
-      if self.every_phase_batch_flag:
+    try:
+      if self.batch_mode == BATCH_MODE.EVERY_WEIGHT:
+        # always call next
         self.current_batch = next(self.datasetiter)
-        self.every_phase_batch_flag = False
-    elif self.batch_mode == BATCH_MODE.EVERY_ITER:
-      # if every_iter flag set, call next and set flag false
-      if self.every_iter_batch_flag:
-        self.current_batch = next(self.datasetiter)
-        self.every_iter_batch_flag = False
-    else:
-      raise Exception(f"Invalid batch mode set: {self.batch_mode}")
+      elif self.batch_mode == BATCH_MODE.EVERY_PHASE:
+        # if every_phase flag set, call next and set flag false
+        if self.every_phase_batch_flag:
+          self.current_batch = next(self.datasetiter)
+          self.every_phase_batch_flag = False
+      elif self.batch_mode == BATCH_MODE.EVERY_ITER:
+        # if every_iter flag set, call next and set flag false
+        if self.every_iter_batch_flag:
+          self.current_batch = next(self.datasetiter)
+          self.every_iter_batch_flag = False
+      else:
+        raise Exception(f"Invalid batch mode set: {self.batch_mode}")
+    except StopIteration:
+      self.reset_iter()
+
     assert self.current_batch, "Current batch is None after get batch call"
+    
     return self.current_batch
   
   def next_batch_phase_mode(self):
@@ -667,6 +672,12 @@ class SpaRSO(Optimiser):
     for i, index in tqdm(enumerate(reversed(self.unmasked_indices)),desc="IMPROVE PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       x, y = self.get_batch()
+
+      # need to recalc forward if batch every weight otherwise comparing loss against a different batch is invalid
+      # also the last batch in an epoch is slightly smaller
+      if self.batch_mode == BATCH_MODE.EVERY_WEIGHT:
+        current_loss, best_prediction = self.forward_pass(x, y)
+
       choice = WEIGHT_CHOICE.SAME
 
       # get slice info (layer, weight index/array, og val, etc) for the parameter index
@@ -746,7 +757,11 @@ class SpaRSO(Optimiser):
       self.masked_flattened_params[index] = new_val
       slice_info.weights.assign(flattened_weights.reshape(slice_info.weight_shape))
       # slice_info.layer.set_weights(layer_weights_list)
-      self.train_acc_metric.update_state(y, best_prediction)
+
+      try:
+        self.train_acc_metric.update_state(y, best_prediction)
+      except:
+        import pdb; pdb.set_trace()
     
       # log the choice somewhere
       self.log(f"weight choice {choice} for index {index}",level=LOG_LEVEL.TRACE)
