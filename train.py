@@ -109,7 +109,7 @@ test_loss, test_acc = model.evaluate(test_dataset, verbose=2)
 
 LOGGER.log_eval_results(test_loss, test_acc)
 
-LOGGER.log(f"Number of forward passes: {optimiser.forward_count}")
+LOGGER.log(f"Number of forward passes: {optimiser.forward_count.numpy()}")
 
 is_pruning = args.run_classic_pruning
 

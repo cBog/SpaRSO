@@ -26,14 +26,14 @@ class Optimiser(ABC):
     self.train_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy()
     self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
     self.model = model
-    self.forward_count = 0
+    self.forward_count = tf.Variable(0)
     self.val_acc_log = []
 
   @tf.function
   def forward_pass(self, x, y):
     prediction = self.model(x, training=True)
     loss = self.loss_fn(y, prediction)
-    self.forward_count += 1
+    self.forward_count.assign_add(tf.constant(1))
     return loss, prediction
 
   def get_delta_weight(self, layer_std_dev):
@@ -62,7 +62,7 @@ class Optimiser(ABC):
     self.LOGGER.save(self.model, f"{label}_model")
 
     state_dict = {}
-    state_dict["forward_count"] = self.forward_count
+    state_dict["forward_count"] = self.forward_count.numpy()
     state_dict.update(state_dict_in)
 
     self.LOGGER.save(state_dict, f"{label}_statedict")
@@ -100,6 +100,7 @@ class StandardSGD(Optimiser):
       self.save_model_state(f"state_{epoch}", {"epoch": epoch})
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+      self.log(f"Number of forward passes {self.forward_count.numpy()}")
 
       training_acc_log.append(train_acc)
 
@@ -154,9 +155,10 @@ class WeightPerBatchRSO(Optimiser):
           self.log(f"reset layer index to {self.layers_idx}")
           train_acc = self.train_acc_metric.result()
           self.log("Training acc over epoch: %.4f" % (float(train_acc),))
+          self.log(f"Number of forward passes {self.forward_count.numpy()}")
 
           self.training_acc_log.append(train_acc)
-          self.training_forwards_log.append(self.forward_count)
+          self.training_forwards_log.append(self.forward_count.numpy())
           self.save_model_state(f"state_{self.count_weight_iters}", 
                                 {"count_weight_iters" : self.count_weight_iters, 
                                  "total_steps" : self.total_steps, 
@@ -373,9 +375,10 @@ class WeightsPerBatchRSO(Optimiser):
       # TODO: make this every nth
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
-
+      self.log(f"Number of forward passes {self.forward_count.numpy()}")
+      
       training_acc_log.append(train_acc)
-      training_forwards_log.append(self.forward_count)
+      training_forwards_log.append(self.forward_count.numpy())
 
       # Reset training metrics at the end of each epoch
       self.train_acc_metric.reset_states()
@@ -1016,10 +1019,10 @@ class SpaRSO(Optimiser):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over iteration: %.4f" % (float(train_acc),))
-      self.log(f"Number of forward passes {self.forward_count}")
+      self.log(f"Number of forward passes {self.forward_count.numpy()}")
 
       training_acc_log.append(train_acc)
-      training_forwards_log.append(self.forward_count)
+      training_forwards_log.append(self.forward_count.numpy())
 
       # Reset training metrics at the end of each full iterations
       self.train_acc_metric.reset_states()
