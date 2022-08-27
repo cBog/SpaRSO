@@ -786,7 +786,8 @@ class SpaRSO(Optimiser):
     # get current loss
     current_loss, best_prediction = self.forward_pass(x, y)
     
-    sorted_indices_desc = np.argsort(np.abs(self.masked_flattened_params))[::-1]
+    # + sparse_mask to ensure that active connections already zero are ordered before masked ones
+    sorted_indices_desc = np.argsort((np.abs(self.masked_flattened_params)+self.sparse_mask))[::-1]
 
     cosine_decay = 0.5 * (1 + np.cos(np.pi * self.iteration_count / self.update_iterations))
     pruned_param_factor = self.initial_prune_factor * cosine_decay
@@ -810,6 +811,8 @@ class SpaRSO(Optimiser):
       
       # TODO: remove calls that run these assert checks after update
       slice_info = self.get_slice_info_from_global_index(remove_index)
+      if not (self.active_params == (self.sparse_mask>0).sum()):
+        import pdb; pdb.set_trace()
     
     new_loss, new_prediction = self.forward_pass(x, y)
 
@@ -818,6 +821,9 @@ class SpaRSO(Optimiser):
     self.log(f"REMOVE PHASE: removed {num_pruned} weights; loss before = {current_loss}, loss after = {new_loss}")
 
     self.unmasked_indices = np.sort(self.unmasked_indices)
+    
+    if not (self.active_params == (self.sparse_mask>0).sum()):
+      import pdb; pdb.set_trace()
 
     return
 
