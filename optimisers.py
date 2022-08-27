@@ -376,7 +376,7 @@ class WeightsPerBatchRSO(Optimiser):
       train_acc = self.train_acc_metric.result()
       self.log("Training acc over epoch: %.4f" % (float(train_acc),))
       self.log(f"Number of forward passes {self.forward_count.numpy()}")
-      
+
       training_acc_log.append(train_acc)
       training_forwards_log.append(self.forward_count.numpy())
 
@@ -996,6 +996,7 @@ class SpaRSO(Optimiser):
     self.set_dataset(dataset)
     training_acc_log = []
     training_forwards_log = []
+    sparse_log = []
 
     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()
@@ -1023,10 +1024,14 @@ class SpaRSO(Optimiser):
 
       training_acc_log.append(train_acc)
       training_forwards_log.append(self.forward_count.numpy())
+      sparse_log.append(self.active_params/self.total_params)
 
       # Reset training metrics at the end of each full iterations
       self.train_acc_metric.reset_states()
       self.evaluate(test_data)
+
+    sparse_log_np = np.array(sparse_log)
+    self.LOGGER.save(sparse_log_np, f"training_sparsity_log")
     return training_acc_log, training_forwards_log, self.val_acc_log
 
     # TODO: add logs and training metrics
