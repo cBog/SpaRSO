@@ -849,6 +849,11 @@ class SpaRSO(Optimiser):
       assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
       x, y = self.get_batch()
 
+      # need to recalc forward if batch every weight otherwise comparing loss against a different batch is invalid
+      # also the last batch in an epoch is slightly smaller
+      if self.batch_mode == BATCH_MODE.EVERY_WEIGHT:
+        current_loss, best_prediction = self.forward_pass(x, y)
+
       # get slice info (layer, weight index/array, og val, etc) for the parameter index
       slice_info = self.get_slice_info_from_global_index(index)
       # layer_weights_list = slice_info.layer.trainable_weights
@@ -920,6 +925,11 @@ class SpaRSO(Optimiser):
 
     for i in tqdm(range(weights_to_swap),desc="REPLACE PHASE",file=self.LOGGER.tqdm_logger,mininterval=30):
       x, y = self.get_batch()
+
+      # need to recalc forward if batch every weight otherwise comparing loss against a different batch is invalid
+      # also the last batch in an epoch is slightly smaller
+      if self.batch_mode == BATCH_MODE.EVERY_WEIGHT:
+        current_loss, best_prediction = self.forward_pass(x, y)
 
       remove_index = remove_indices[i]
       add_index = add_indices[i]
