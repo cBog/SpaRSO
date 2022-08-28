@@ -1016,6 +1016,7 @@ class SpaRSO(Optimiser):
     sparse_log = []
 
     for warm_up in tqdm(range(self.warm_up_replace_phases),file=sys.stdout):
+      self.log(f"WARM UP PHASE {warm_up} of {self.warm_up_replace_phases}")
       self.next_batch_iter_mode()
       assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
       self.replace_phase()
