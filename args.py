@@ -135,6 +135,12 @@ def parse_args():
         action='store_true',
         help="Don't mask and adjust the norm weights and biases (leave as ones and zeros)"
     )
+    parser.add_argument(
+        "--warm-up-replace-phases",
+        default=0,
+        type=int,
+        help="Number of replace phases to run as warm up"
+    )
 
 
 

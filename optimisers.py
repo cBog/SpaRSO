@@ -448,7 +448,7 @@ class SpaRSO(Optimiser):
 
 # TODO: handle batch norm....
 
-  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, const_norm_weights=False, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
+  def __init__(self, model, initial_density, maximum_density, initial_prune_factor, swap_proportion, update_iterations, phases, warm_up_replace_phases, const_norm_weights=False, consider_zero_improve=True, batch_mode=BATCH_MODE.EVERY_ITER,):
     super(SpaRSO, self).__init__(model)
     self.batch_mode = batch_mode
     self.initial_density = initial_density
@@ -457,6 +457,7 @@ class SpaRSO(Optimiser):
     self.swap_proportion = swap_proportion
     self.update_iterations = update_iterations
     self.phases = phases
+    self.warm_up_replace_phases = warm_up_replace_phases
     self.const_norm_weights = const_norm_weights
     self.consider_zero_improve = consider_zero_improve
     # TODO: some sort of maximum sparsity schedule
@@ -1013,6 +1014,25 @@ class SpaRSO(Optimiser):
     training_acc_log = []
     training_forwards_log = []
     sparse_log = []
+
+    for warm_up in tqdm(range(self.warm_up_replace_phases),file=sys.stdout):
+      self.next_batch_iter_mode()
+      assert (self.active_params == (self.sparse_mask>0).sum()), f"active params and sparse mask count not equal at phase {i}:{phase}"
+      self.replace_phase()
+
+      self.save_model_state(f"state_warm_up_{warm_up}")
+      assert (self.active_params == (self.sparse_mask>0).sum()), "active params and sparse mask count not equal"
+      train_acc = self.train_acc_metric.result()
+      self.log("Training acc over warm up: %.4f" % (float(train_acc),))
+      self.log(f"Number of forward passes {self.forward_count.numpy()}")
+
+      training_acc_log.append(train_acc)
+      training_forwards_log.append(self.forward_count.numpy())
+      sparse_log.append(self.active_params/self.total_params)
+
+      # Reset training metrics at the end of each full iterations
+      self.train_acc_metric.reset_states()
+      self.evaluate(test_data)
 
     for self.iteration_count in tqdm(range(self.update_iterations),file=sys.stdout):
       self.next_batch_iter_mode()

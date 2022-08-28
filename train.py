@@ -90,6 +90,7 @@ elif args.optimiser == "spaRSO":
                      swap_proportion=args.swap_proportion, 
                      update_iterations=args.opt_iters, 
                      phases=args.phases,
+                     warm_up_replace_phases=args.warm_up_replace_phases,
                      const_norm_weights=args.const_norm_weights,
                      consider_zero_improve=args.consider_zero_improve, 
                      batch_mode=args.batch_mode)
