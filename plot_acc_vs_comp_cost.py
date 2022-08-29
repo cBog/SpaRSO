@@ -304,3 +304,5 @@ plot(["2B","6A","6B","6C"],
      is_plot_train=False,
      is_plot_val=True,
      baseline_name="warm_up=0,S_replace=0.3")
+
+# TODO: plot param count for prune regrow experiments
