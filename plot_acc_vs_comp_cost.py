@@ -120,6 +120,7 @@ plot(["1F","2A","2B","2C","2D","2E"],
      is_plot_train=False,
      is_plot_val=True,
      baseline_name="S_replace=0.0")
+# winner is 0.3
 
 
 # EXPERIMENT 3 prune and replace
@@ -181,7 +182,7 @@ plot(["1F","3A","3D","3E"],
      is_plot_val=True,
      baseline_name="S_max=0.8,S_prune=0.0")
 
-# winner is 0.3 and 0.3
+# winner is 0.7 and 0.3
 # Plotting best of both on the same chart..? Not needed as winner from first is also plotted in the second
 
 # EXPERIMENT 4_1 - zero improve pruning
@@ -271,5 +272,35 @@ plot(["2B","3A","5A"],
      is_compute_cost=True,
      is_plot_train=False,
      is_plot_val=True,)
+# replace is the best.. but not taking the best of each! need to rerun with the best of each (only difference is prune factor 0.1=>0.3)
+# if adding warm up will need to compare against the warm up version of replace in exp6
 
-
+# EXPERIMENT 6 warm up phases
+plot(["2B","6A","6B","6C"], 
+     "Training accuracy with increasing warm up phases against forward count",
+     experiment="Exp6",
+     is_compute_cost=False,
+     is_plot_train=True,
+     is_plot_val=False,
+     baseline_name="warm_up=0,S_replace=0.3")
+plot(["2B","6A","6B","6C"], 
+     "Validation accuracy with increasing warm up phases against forward count",
+     experiment="Exp6",
+     is_compute_cost=False,
+     is_plot_train=False,
+     is_plot_val=True,
+     baseline_name="warm_up=0,S_replace=0.3")
+plot(["2B","6A","6B","6C"], 
+     "Training accuracy with increasing warm up phases against compute cost",
+     experiment="Exp6",
+     is_compute_cost=True,
+     is_plot_train=True,
+     is_plot_val=False,
+     baseline_name="warm_up=0,S_replace=0.3")
+plot(["2B","6A","6B","6C"], 
+     "Validation accuracy with increasing warm up phases against compute cost",
+     experiment="Exp6",
+     is_compute_cost=True,
+     is_plot_train=False,
+     is_plot_val=True,
+     baseline_name="warm_up=0,S_replace=0.3")
