@@ -24,7 +24,7 @@ log_dict = {
     "4B":("20220829_0046_9c5aebed3c","S_max=0.7,S_prune=0.1,zero_improve",0.2),
     "4C":("20220829_0431_9c5aebed3c","S_replace=0.3,batch_every_phase",0.2),
     "4D":("20220829_0552_9c5aebed3c","S_replace=0.3,batch_every_iter",0.2),
-    "5A":("20220828_2056_366016aff5","combined_phases,S_init=0.8,S_replace=0.3,S_max=0.7,S_prune=0.1",0.2), # needs to be compared against the non combined somehow
+    "5A":("20220829_1301_0891ac381b","combined_phases,S_init=0.8,S_replace=0.3,S_max=0.7,S_prune=0.3",0.2), # needs to be compared against the non combined somehow (previous with 0.3 pruning is 20220828_2056_366016aff5)
     "6A":("20220828_2103_79afd14a6b","warm_up=1,S_replace=0.3",0.2), # compare against the replace only run 0.3
     "6B":("20220828_2340_79afd14a6b","warm_up=2,S_replace=0.3",0.2),
     "6C":("20220829_0223_9c5aebed3c","warm_up=3,S_replace=0.3",0.2),
@@ -123,7 +123,7 @@ plot(["1F","2A","2B","2C","2D","2E"],
 # winner is 0.3
 
 
-# EXPERIMENT 3 prune and replace
+# EXPERIMENT 3 prune and regrow
 plot(["1F","3A","3B","3C"], 
      "Training accuracy with increasing S_max against forward count",
      experiment="Exp3",
@@ -248,25 +248,25 @@ plot(["2B","4C","4D"],
 # Every phase is the winner (based on validation... just about) but maybe not much in it so leave it as weight to compare with RSO?
 
 # EXPERIMENT 5 - combining grow strategies
-plot(["2B","3A","5A"], 
+plot(["2B","3E","5A"], 
      "Training accuracy with combined phases against forward count",
      experiment="Exp5",
      is_compute_cost=False,
      is_plot_train=True,
      is_plot_val=False,)
-plot(["2B","3A","5A"], 
+plot(["2B","3E","5A"], 
      "Validation accuracy with combined phases against forward count",
      experiment="Exp5",
      is_compute_cost=False,
      is_plot_train=False,
      is_plot_val=True,)
-plot(["2B","3A","5A"], 
+plot(["2B","3E","5A"], 
      "Training accuracy with combined phasess against compute cost",
      experiment="Exp5",
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,)
-plot(["2B","3A","5A"], 
+plot(["2B","3E","5A"], 
      "Validation accuracy with combined phases against compute cost",
      experiment="Exp5",
      is_compute_cost=True,
