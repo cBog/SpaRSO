@@ -2,6 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import sys, pathlib
 
+batch_size=1024
+
 log_dict = {
     "1A":("20220826_1621_a634e5b000","S_init=0.3",0.7),
     "1B":("20220827_1048_45b9eb8795","S_init=0.4",0.6),
@@ -54,7 +56,7 @@ def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plo
             sparsity_log = np.array([default_density]*len(val_accs))
 
         if (is_compute_cost):
-            fwd_cnts = fwd_cnts * sparsity_log
+            fwd_cnts = fwd_cnts * sparsity_log * batch_size
         
         if is_plot_train:
             plt.plot(fwd_cnts, train_accs, label=f"{run_name} - train")
