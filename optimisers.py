@@ -692,7 +692,13 @@ class SpaRSO(Optimiser):
 
       # retest + and - perturbance as per RSO
       new_val = slice_info.og_val
-      delta_weight = self.get_delta_weight(self.layer_std_devs[slice_info.layer])
+
+      # as per paper: for stdevs, they "linearly anneal the standard deviation σcdat a cycle
+      # c of the sampling distribution for layer d, such that thestandard deviation at the 
+      # final cycle C is σCd = σ1d/10."
+      # equivalent to between σCd and σCd - (0.9 * σCd)
+      stddev = self.layer_std_devs[slice_info.layer] - (0.9 * self.layer_std_devs[slice_info.layer] * (self.iteration_count/(self.update_iterations-1)))
+      delta_weight = self.get_delta_weight(stddev)
 
       # TRY + DELTA
       try_val = slice_info.og_val + delta_weight
