@@ -14,5 +14,5 @@ for log_id in sys.argv[1:]:
     plt.ylabel("accuracy")
     plt.plot(fwd_cnts, train_accs, label="training accuracy")
     plt.plot(fwd_cnts, val_accs, label="validation accuracy")
-    plt.legend(loc="upper left")
+    plt.legend(loc="lower right")
     fig.savefig(f"logs/{log_id}/plot_accs_fwd_cnts.png")
