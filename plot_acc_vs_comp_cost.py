@@ -5,7 +5,7 @@ import sys, pathlib
 batch_size=1024
 
 log_dict = {
-    "0A":("...","SGD",1.0),
+    "0A":("20220831_1736_da00fbe4e2","SGD",1.0),
     "0B":("20220829_1935_faa2d8b2ba","SGD_PRUNED 80",1.0),
     "0C":("20220829_1952_faa2d8b2ba","SGD_PRUNED 90",1.0),
     "0D":("20220826_1400_c6ab1f8864","RSO",1.0),
@@ -36,17 +36,23 @@ log_dict = {
     "6C":("20220829_0223_9c5aebed3c","warm_up=3,S_replace=0.3",0.2),
     "FINALA":("20220829_1318_1f4d3bea6b","Final run replace only",0.2),
     "FINALB":("20220829_1323_1f4d3bea6b","Final run all phases",0.2),
-    "FINALC":("20220830_1102_010b5183c8","Final run with bs32, all phases, 10 warm up phases and 100 iters",0.2),
+    "FINALC":("20220830_1103_95fdf2e55d","Final run with bs32, all phases, 10 warm up phases and 100 iters",0.2),
     "FINALD":("20220831_0953_e15020ca50","Final run with bs64, all phases, 10 warm up phases and 100 iters",0.2),
-    "FINALE":("...","Final run replace only different config",0.2),
+    "FINALE":("20220831_1735_da00fbe4e2","Final run replace only different config",0.2),
 }
 
-def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plot_val, baseline_name=None):
+def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plot_val, is_plot_sparsity=False, baseline_name=None, plot_limits=None, report_name=None):
 
     fig = plt.figure()
     plt.title(plot_name)
-    plt.xlabel("compute cost" if is_compute_cost else "count forwards")
-    plt.ylabel("accuracy")
+    if not is_plot_sparsity:
+      plt.xlabel("compute cost" if is_compute_cost else "count forwards")
+    else:
+      plt.xlabel("Iterations")
+    if not is_plot_sparsity:
+     plt.ylabel("accuracy")
+    else:
+     plt.ylabel("density")
 
     for i, run_id in enumerate(run_list):
         (log_id, run_name, default_density) = log_dict[run_id]
@@ -64,16 +70,27 @@ def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plo
         else:
             sparsity_log = np.array([default_density]*len(val_accs))
 
+        if plot_limits:
+          limit = int(plot_limits[i]*len(fwd_cnts))
+          fwd_cnts = fwd_cnts[:limit]
+          train_accs = train_accs[:limit]
+          val_accs = val_accs[:limit]
+          sparsity_log = sparsity_log[:limit]
+
         if (is_compute_cost):
-          import pdb; pdb.set_trace()
           fwd_cnts = fwd_cnts * sparsity_log * batch_size
         
         if is_plot_train:
-            plt.plot(fwd_cnts, train_accs, label=f"{run_name} - train")
+            plt.plot(fwd_cnts, train_accs, label=f"{run_name}")
         if is_plot_val:
-            plt.plot(fwd_cnts, val_accs, label=f"{run_name} - validation")
+            plt.plot(fwd_cnts, val_accs, label=f"{run_name}")
+        if is_plot_sparsity:
+            plt.plot(sparsity_log, label=f"{run_name}")
     plt.legend(loc="lower right", fontsize="x-small")
     fig.savefig(f"logs/{experiment}/{plot_name}.png")
+    if report_name:
+     fig.savefig(f"logs/{experiment}/{report_name}.png")
+     fig.savefig(f"logs/ReportPlots/{report_name}.png")
 
 # EXPERIMENT 1 increasing sparsity analysis
 plot(["1A","1B","1C","1D","1E","1F","1G"], 
@@ -93,13 +110,15 @@ plot(["1A","1B","1C","1D","1E","1F","1G"],
      experiment="Exp1",
      is_compute_cost=True,
      is_plot_train=True,
-     is_plot_val=False)
+     is_plot_val=False,
+     report_name="Exp1_train")
 plot(["1A","1B","1C","1D","1E","1F","1G"], 
      "Validation accuracy with increasing S_init against compute cost",
      experiment="Exp1",
      is_compute_cost=True,
      is_plot_train=False,
-     is_plot_val=True)
+     is_plot_val=True,
+     report_name="Exp1_val")
 
 
 # EXPERIMENT 2 replace
@@ -124,7 +143,8 @@ plot(["1F","2A","2B","2C","2D","2E"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="S_replace=0.0")
+     baseline_name="S_replace=0.0",
+     report_name="Exp2_train")
 plot(["1F","2A","2B","2C","2D","2E"], 
      "Validation accuracy with increasing S_replace against compute cost",
      experiment="Exp2",
@@ -156,7 +176,8 @@ plot(["1F","3A","3B","3C"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="S_min=0.8,S_prune=0.0")
+     baseline_name="S_min=0.8,S_prune=0.0",
+     report_name="Exp3_1")
 plot(["1F","3A","3B","3C"], 
      "Validation accuracy with increasing S_min against compute cost",
      experiment="Exp3",
@@ -164,6 +185,16 @@ plot(["1F","3A","3B","3C"],
      is_plot_train=False,
      is_plot_val=True,
      baseline_name="S_min=0.8,S_prune=0.0")
+plot(["1F","3A","3B","3C"], 
+     "Plot of density over time with increasing S_min",
+     experiment="Exp3",
+     is_compute_cost=True,
+     is_plot_train=False,
+     is_plot_val=False,
+     is_plot_sparsity=True,
+     plot_limits=[0.5,1.0,1.0,1.0],
+     baseline_name="S_min=0.8,S_prune=0.0",
+     report_name="Exp3_3")
 
 plot(["1F","3A","3D","3E"], 
      "Training accuracy with increasing S_prune against forward count",
@@ -185,7 +216,8 @@ plot(["1F","3A","3D","3E"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="S_min=0.8,S_prune=0.0")
+     baseline_name="S_min=0.8,S_prune=0.0",
+     report_name="Exp3_2")
 plot(["1F","3A","3D","3E"], 
      "Validation accuracy with increasing S_prune against compute cost",
      experiment="Exp3",
@@ -218,7 +250,8 @@ plot(["3A","4A","4B"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="S_min=0.7,S_prune=0.1")
+     baseline_name="S_min=0.7,S_prune=0.1",
+     report_name="Exp4_1")
 plot(["3A","4A","4B"], 
      "Validation accuracy with zero_improve_pruning enabled against compute cost",
      experiment="Exp4_1",
@@ -249,7 +282,8 @@ plot(["2B","4C","4D"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="S_replace=0.3,batch_every_weight")
+     baseline_name="S_replace=0.3,batch_every_weight",
+     report_name="Exp4_2")
 plot(["2B","4C","4D"], 
      "Validation accuracy with different batch modes against compute cost",
      experiment="Exp4_2",
@@ -277,7 +311,8 @@ plot(["2B","3E","5A"],
      experiment="Exp5",
      is_compute_cost=True,
      is_plot_train=True,
-     is_plot_val=False,)
+     is_plot_val=False,
+     report_name="Exp5_train")
 plot(["2B","3E","5A"], 
      "Validation accuracy with combined phases against compute cost",
      experiment="Exp5",
@@ -308,7 +343,8 @@ plot(["2B","6A","6B","6C"],
      is_compute_cost=True,
      is_plot_train=True,
      is_plot_val=False,
-     baseline_name="warm_up=0,S_replace=0.3")
+     baseline_name="warm_up=0,S_replace=0.3",
+     report_name="Exp6_train")
 plot(["2B","6A","6B","6C"], 
      "Validation accuracy with increasing warm up phases against compute cost",
      experiment="Exp6",
@@ -318,3 +354,22 @@ plot(["2B","6A","6B","6C"],
      baseline_name="warm_up=0,S_replace=0.3")
 
 # TODO: plot param count for prune regrow experiments
+
+# FINAL warm up phases
+
+plot(["0D","FINALA","FINALB"], 
+     "Training accuracy with increasing warm up phases against compute cost",
+     experiment="FinalRuns",
+     is_compute_cost=True,
+     is_plot_train=True,
+     is_plot_val=False,
+     plot_limits=[0.1,1.0,1.0],
+     report_name="Final1")
+plot(["0D","FINALA","FINALB"], 
+     "Validation accuracy with increasing warm up phases against compute cost",
+     experiment="FinalRuns",
+     is_compute_cost=True,
+     is_plot_train=False,
+     is_plot_val=True,
+     plot_limits=[1.0,1.0,1.0],
+     report_name="Final2")
