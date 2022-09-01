@@ -34,7 +34,7 @@ dir_array=(
     logs/20220829_1323_1f4d3bea6b
     logs/20220830_1103_95fdf2e55d
     logs/20220831_0953_e15020ca50
-    logs/20220831_1735_da00fbe4e2
+    logs/20220831_1954_25ae3556d4
     logs/Exp1
     logs/Exp2
     logs/Exp3

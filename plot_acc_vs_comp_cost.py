@@ -34,11 +34,11 @@ log_dict = {
     "6A":("20220828_2103_79afd14a6b","warm_up=1,S_replace=0.3",0.2), # compare against the replace only run 0.3
     "6B":("20220828_2340_79afd14a6b","warm_up=2,S_replace=0.3",0.2),
     "6C":("20220829_0223_9c5aebed3c","warm_up=3,S_replace=0.3",0.2),
-    "FINALA":("20220829_1318_1f4d3bea6b","Final run replace only",0.2),
-    "FINALB":("20220829_1323_1f4d3bea6b","Final run all phases",0.2),
+    "FINALA":("20220829_1318_1f4d3bea6b","SpaRSO_1 with replace only",0.2),
+    "FINALB":("20220829_1323_1f4d3bea6b","SpaRSO_2 with all phases",0.2),
     "FINALC":("20220830_1103_95fdf2e55d","Final run with bs32, all phases, 10 warm up phases and 100 iters",0.2),
     "FINALD":("20220831_0953_e15020ca50","Final run with bs64, all phases, 10 warm up phases and 100 iters",0.2),
-    "FINALE":("20220831_1735_da00fbe4e2","Final run replace only different config",0.2),
+    "FINALE":("20220831_1954_25ae3556d4","Final run replace only different config",0.2),
 }
 
 def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plot_val, is_plot_sparsity=False, baseline_name=None, plot_limits=None, report_name=None):
@@ -64,6 +64,10 @@ def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plo
         train_accs = np.load(f"logs/{log_id}/training_acc_results.npy")
         val_accs = np.load(f"logs/{log_id}/val_acc_results.npy")
 
+        print(f"RUN: {i}--{run_id}")
+        print(f"Max train acc={np.max(train_accs)}")
+        print(f"Max val acc={np.max(val_accs)}")
+
         file = pathlib.Path(f"logs/{log_id}/training_sparsity_log.npy")
         if file.exists():
             sparsity_log = np.load(f"logs/{log_id}/training_sparsity_log.npy")
@@ -78,7 +82,11 @@ def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plo
           sparsity_log = sparsity_log[:limit]
 
         if (is_compute_cost):
-          fwd_cnts = fwd_cnts * sparsity_log * batch_size
+          fwd_diffs = np.diff(fwd_cnts, prepend=0)
+          fwd_diffs = fwd_diffs * sparsity_log * batch_size
+          fwd_cnts = np.cumsum(fwd_diffs)
+
+        print(f"Total compute cost={fwd_cnts[-1]}")
         
         if is_plot_train:
             plt.plot(fwd_cnts, train_accs, label=f"{run_name}")
@@ -87,10 +95,10 @@ def plot(run_list, plot_name, experiment, is_compute_cost, is_plot_train, is_plo
         if is_plot_sparsity:
             plt.plot(sparsity_log, label=f"{run_name}")
     plt.legend(loc="lower right", fontsize="x-small")
-    fig.savefig(f"logs/{experiment}/{plot_name}.png")
+    fig.savefig(f"logs/{experiment}/{plot_name}.png", bbox_inches='tight')
     if report_name:
-     fig.savefig(f"logs/{experiment}/{report_name}.png")
-     fig.savefig(f"logs/ReportPlots/{report_name}.png")
+     fig.savefig(f"logs/{experiment}/{report_name}.png", bbox_inches='tight')
+     fig.savefig(f"logs/ReportPlots/{report_name}.png", bbox_inches='tight')
 
 # EXPERIMENT 1 increasing sparsity analysis
 plot(["1A","1B","1C","1D","1E","1F","1G"], 
@@ -358,7 +366,7 @@ plot(["2B","6A","6B","6C"],
 # FINAL warm up phases
 
 plot(["0D","FINALA","FINALB"], 
-     "Training accuracy with increasing warm up phases against compute cost",
+     "Training accuracy against compute cost with final configurations compared against RSO",
      experiment="FinalRuns",
      is_compute_cost=True,
      is_plot_train=True,
@@ -366,10 +374,26 @@ plot(["0D","FINALA","FINALB"],
      plot_limits=[0.1,1.0,1.0],
      report_name="Final1")
 plot(["0D","FINALA","FINALB"], 
-     "Validation accuracy with increasing warm up phases against compute cost",
+     "Validation accuracy against compute cost with final configurations compared against RSO",
      experiment="FinalRuns",
      is_compute_cost=True,
      is_plot_train=False,
      is_plot_val=True,
      plot_limits=[1.0,1.0,1.0],
      report_name="Final2")
+
+plot(["FINALA","FINALB"], 
+     "Training accuracy against compute cost with final configurations",
+     experiment="FinalRuns",
+     is_compute_cost=True,
+     is_plot_train=True,
+     is_plot_val=False,
+     plot_limits=[1.0,1.0])
+plot(["FINALA","FINALB"], 
+     "Validation accuracy against compute cost with final configurations",
+     experiment="FinalRuns",
+     is_compute_cost=True,
+     is_plot_train=False,
+     is_plot_val=True,
+     plot_limits=[1.0,1.0],
+     report_name="Final3")
