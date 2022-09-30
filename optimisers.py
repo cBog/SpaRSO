@@ -484,6 +484,8 @@ class SpaRSO(Optimiser):
     # layer to std dev for layer map
     self.layer_std_devs = {}
 
+    self.norm_weight_indices = []
+
     # create a giant flattened array of all parameters
     # takes each layer, flattens it, concatenate it also record a map from each layer index to the start and end index
     # store also each index to the layer and weight index!
@@ -520,7 +522,8 @@ class SpaRSO(Optimiser):
           self.global_slice_layer_map.append(layer)
           self.global_slice_weight_idx_map.append(i)
 
-          self.weight_slice_starts.append(self.flattened_params.shape[0])
+          slice_start_idx = self.flattened_params.shape[0]
+          self.weight_slice_starts.append(slice_start_idx)
           # import pdb; pdb.set_trace()
           flattened_weights = weights.numpy().flatten()
           # TODO: find a way to set values using assign/tf-ops so that tf can optimise things
@@ -529,7 +532,11 @@ class SpaRSO(Optimiser):
 
           self.flattened_params = np.concatenate((self.flattened_params, flattened_weights))
 
-          self.weight_slice_ends.append(self.flattened_params.shape[0])
+          slice_end_idx = self.flattened_params.shape[0]
+          self.weight_slice_ends.append(slice_end_idx)
+          if isinstance(layer, tf.keras.layers.BatchNormalization) or isinstance(layer, tf.keras.layers.LayerNormalization):
+            self.norm_weight_indices.extend(list(range(slice_start_idx, slice_end_idx)))
+
 
     # define global mask and masked params
     # define a uniformly random mask over the whole parameter space and multiply by the parameter space
@@ -538,7 +545,12 @@ class SpaRSO(Optimiser):
     self.sparse_mask = np.zeros([self.total_params],dtype=np.float32)
     init_num_params = int(self.initial_density * self.total_params)
     self.active_params = init_num_params
-    self.unmasked_indices = np.sort(np.random.choice(self.total_params,init_num_params,replace=False))
+    num_aditional_params_to_unmask = init_num_params - len(self.norm_weight_indices)
+    unmask_dist = np.ones([self.total_params])
+    unmask_dist[self.norm_weight_indices] = 0.0
+    unmask_dist = unmask_dist/num_aditional_params_to_unmask
+    self.unmasked_indices = np.sort(np.random.choice(self.total_params,num_aditional_params_to_unmask,replace=False,p=unmask_dist))
+    self.sparse_mask[self.norm_weight_indices] = 1
     self.sparse_mask[self.unmasked_indices] = 1
     self.masked_flattened_params = self.flattened_params * self.sparse_mask
 
