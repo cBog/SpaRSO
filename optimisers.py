@@ -550,7 +550,7 @@ class SpaRSO(Optimiser):
     unmask_dist[self.norm_weight_indices] = 0.0
     unmask_dist = unmask_dist/(self.total_params-len(self.norm_weight_indices))
     self.unmasked_indices = np.random.choice(self.total_params,num_aditional_params_to_unmask,replace=False,p=unmask_dist)
-    self.unmasked_indices.extend(self.norm_weight_indices)
+    self.unmasked_indices.append(self.norm_weight_indices)
     self.unmasked_indices = np.sort(self.unmasked_indices)
     self.sparse_mask[self.unmasked_indices] = 1
     self.masked_flattened_params = self.flattened_params * self.sparse_mask
